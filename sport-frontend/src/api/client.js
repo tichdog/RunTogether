@@ -42,6 +42,7 @@ export const api = {
     body: JSON.stringify({ role }),
   }),
   blockUser: id => request(`/api/users/${id}/block`, { method: "PATCH" }),
+  deleteUser: id => request(`/api/users/${id}`, { method: "DELETE" }),
   history: id => request(`/api/users/${id}/history`),
   achievements: id => request(`/api/users/${id}/achievements`),
 

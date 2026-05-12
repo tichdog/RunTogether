@@ -39,7 +39,7 @@ export async function requireAuth(req, res, next) {
 
     const payload = jwt.verify(token, env.jwtSecret);
     const { rows } = await query(
-      `select id, email, phone, full_name, role, account_status, phone_verified, email_verified,
+      `select id, email, phone, first_name, last_name, gender, full_name, role, account_status, phone_verified, email_verified,
               verification_status, avatar_url, privacy_settings, created_at
          from users
         where id = $1`,
@@ -59,7 +59,7 @@ export async function requireAuth(req, res, next) {
 }
 
 export function requireAdmin(req, res, next) {
-  if (req.user?.role !== "admin") {
+  if (!["admin", "super_admin"].includes(req.user?.role)) {
     return next(forbidden("Доступно только администратору"));
   }
   return next();
@@ -67,7 +67,7 @@ export function requireAdmin(req, res, next) {
 
 export function requireSelfOrAdmin(paramName = "id") {
   return (req, res, next) => {
-    if (req.user?.role === "admin" || Number(req.params[paramName]) === Number(req.user?.id)) {
+    if (["admin", "super_admin"].includes(req.user?.role) || Number(req.params[paramName]) === Number(req.user?.id)) {
       return next();
     }
     return next(forbidden());

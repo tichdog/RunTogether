@@ -12,7 +12,7 @@ export const workoutsRouter = Router();
 workoutsRouter.use(requireAuth);
 
 function isOwnerOrAdmin(req, workout) {
-  return req.user.role === "admin" || Number(workout.organizer_id) === Number(req.user.id);
+  return ["admin", "super_admin"].includes(req.user.role) || Number(workout.organizer_id) === Number(req.user.id);
 }
 
 function parseWorkoutBody(body) {

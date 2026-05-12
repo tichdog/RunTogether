@@ -1,4 +1,4 @@
-import { T } from "../../tokens";
+import { ROLE_LABELS, T } from "../../tokens";
 import { Btn } from "../ui";
 
 const NAV_ITEMS = [
@@ -58,7 +58,7 @@ export function Sidebar({ active, setActive, user, onLogout }) {
       <div style={{ padding: "14px 16px", borderTop: "1px solid #2D2C28" }}>
         <div style={{ fontSize: 12, fontWeight: 700, color: T.sidebarText }}>{user?.name}</div>
         <div style={{ fontSize: 11, color: T.sidebarMuted, marginBottom: 10 }}>
-          {user?.role === "admin" ? "Администратор" : "Участник"}
+          {ROLE_LABELS[user?.role] || "Участник"}
         </div>
         <Btn onClick={onLogout} variant="ghost" style={{ width: "100%", color: T.sidebarText, borderColor: "#3B3A36" }}>
           Выйти
