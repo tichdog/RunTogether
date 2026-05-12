@@ -1,0 +1,54 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Build output
+dist/
+build/
+.next/
+out/
+coverage/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+sport-backend/backend.log
+sport-backend/backend.err.log
+sport-frontend/frontend.log
+sport-frontend/frontend.err.log
+
+# Runtime uploads and temporary files
+uploads/
+sport-backend/uploads/
+tmp/
+temp/
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Package manager caches
+.npm/
+.pnpm-store/
+.yarn/
+!.yarn/releases/
+!.yarn/plugins/
+!.yarn/sdks/
+!.yarn/versions/
+
+# Docker local data, if any
+postgres-data/
+pgdata/
