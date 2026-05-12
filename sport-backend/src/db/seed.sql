@@ -1,9 +1,13 @@
 insert into users (email, phone, password_hash, first_name, last_name, gender, full_name, role, phone_verified, email_verified, verification_status)
 values
-  ('admin@sport.local', '+79990000001', '$2a$10$HNYX9PNnVvJLPh8zErBFw.TVdINQW5lcmyuMjm6SSUFWLDjjRDMAK', 'Иван', 'Иванов', 'male', 'Иван Иванов', 'admin', true, true, 'fully_verified'),
+  ('admin@sport.local', '+79990000001', '$2a$10$HNYX9PNnVvJLPh8zErBFw.TVdINQW5lcmyuMjm6SSUFWLDjjRDMAK', 'Иван', 'Иванов', 'male', 'Иван Иванов', 'super_admin', true, true, 'fully_verified'),
   ('alina@sport.local', '+79990000002', '$2a$10$HNYX9PNnVvJLPh8zErBFw.TVdINQW5lcmyuMjm6SSUFWLDjjRDMAK', 'Алина', 'Крылова', 'female', 'Алина Крылова', 'member', true, true, 'fully_verified'),
   ('mark@sport.local', '+79990000003', '$2a$10$HNYX9PNnVvJLPh8zErBFw.TVdINQW5lcmyuMjm6SSUFWLDjjRDMAK', 'Марк', 'Ильин', 'male', 'Марк Ильин', 'member', true, false, 'phone_verified')
 on conflict (email) do nothing;
+
+update users
+   set role = 'super_admin'
+ where email = 'admin@sport.local';
 
 insert into workouts (
   organizer_id, title, description, start_at, duration_minutes, meeting_point_name,

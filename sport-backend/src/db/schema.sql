@@ -8,7 +8,7 @@ create table if not exists users (
   gender text check (gender in ('male', 'female', 'other')),
   full_name text not null,
   avatar_url text,
-  role text not null default 'member' check (role in ('member', 'admin')),
+  role text not null default 'member' check (role in ('member', 'admin', 'super_admin')),
   account_status text not null default 'active' check (account_status in ('active', 'blocked')),
   phone_verified boolean not null default false,
   email_verified boolean not null default false,
@@ -22,6 +22,8 @@ create table if not exists users (
 alter table users add column if not exists first_name text;
 alter table users add column if not exists last_name text;
 alter table users add column if not exists gender text;
+alter table users drop constraint if exists users_role_check;
+alter table users add constraint users_role_check check (role in ('member', 'admin', 'super_admin'));
 
 create table if not exists system_settings (
   key text primary key,

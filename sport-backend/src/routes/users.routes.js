@@ -2,7 +2,7 @@ import { Router } from "express";
 import { query } from "../config/db.js";
 import { requireAdmin, requireAuth, requireSelfOrAdmin } from "../middleware/auth.js";
 import { upload } from "../middleware/upload.js";
-import { badRequest, notFound } from "../utils/httpError.js";
+import { badRequest, forbidden, notFound } from "../utils/httpError.js";
 import { publicUser } from "../utils/userMapper.js";
 
 export const usersRouter = Router();
@@ -17,6 +17,17 @@ const USER_SELECT = `
 `;
 
 usersRouter.use(requireAuth);
+
+const ADMIN_ROLES = new Set(["admin", "super_admin"]);
+
+function isAdminRole(role) {
+  return ADMIN_ROLES.has(role);
+}
+
+async function getUserById(id) {
+  const { rows } = await query("select id, role from users where id = $1", [id]);
+  return rows[0];
+}
 
 usersRouter.get("/", requireAdmin, async (req, res, next) => {
   try {
@@ -95,7 +106,17 @@ usersRouter.post("/me/avatar", upload.single("avatar"), async (req, res, next) =
 usersRouter.patch("/:id/role", requireAdmin, async (req, res, next) => {
   try {
     const role = req.body.role;
-    if (!["member", "admin"].includes(role)) throw badRequest("Некорректная роль");
+    if (!["member", "admin", "super_admin"].includes(role)) throw badRequest("Некорректная роль");
+
+    const target = await getUserById(req.params.id);
+    if (!target) throw notFound("Пользователь не найден");
+    if (Number(target.id) === Number(req.user.id) && role !== req.user.role) {
+      throw badRequest("Нельзя изменить свою роль");
+    }
+    if ((isAdminRole(target.role) || isAdminRole(role)) && req.user.role !== "super_admin") {
+      throw forbidden("Назначать и изменять админов может только супер-админ");
+    }
+
     const { rows } = await query(
       "update users set role = $2, updated_at = now() where id = $1 returning *",
       [req.params.id, role],
@@ -109,12 +130,45 @@ usersRouter.patch("/:id/role", requireAdmin, async (req, res, next) => {
 
 usersRouter.patch("/:id/block", requireAdmin, async (req, res, next) => {
   try {
+    const target = await getUserById(req.params.id);
+    if (!target) throw notFound("Пользователь не найден");
+    if (Number(target.id) === Number(req.user.id)) {
+      throw badRequest("Нельзя заблокировать самого себя");
+    }
+    if (isAdminRole(target.role) && req.user.role !== "super_admin") {
+      throw forbidden("Блокировать админов может только супер-админ");
+    }
+
     const { rows } = await query(
       "update users set account_status = 'blocked', updated_at = now() where id = $1 returning *",
       [req.params.id],
     );
     if (!rows[0]) throw notFound("Пользователь не найден");
     res.json({ user: publicUser(rows[0]) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+usersRouter.delete("/:id", requireAdmin, async (req, res, next) => {
+  try {
+    const target = await getUserById(req.params.id);
+    if (!target) throw notFound("Пользователь не найден");
+    if (Number(target.id) === Number(req.user.id)) {
+      throw badRequest("Админ не может удалить сам себя");
+    }
+    if (isAdminRole(target.role) && req.user.role !== "super_admin") {
+      throw forbidden("Удалять админов может только супер-админ");
+    }
+    if (target.role === "super_admin") {
+      const { rows } = await query("select count(*)::int as count from users where role = 'super_admin'");
+      if (rows[0].count <= 1) {
+        throw badRequest("Нельзя удалить последнего супер-админа");
+      }
+    }
+
+    await query("delete from users where id = $1", [req.params.id]);
+    res.status(204).send();
   } catch (error) {
     next(error);
   }

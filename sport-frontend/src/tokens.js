@@ -27,11 +27,13 @@ export const T = {
 export const ROLE_LABELS = {
   member: "Участник",
   admin: "Администратор",
+  super_admin: "Супер-админ",
 };
 
 export const ROLE_COLORS = {
   member: { bg: "#EFF6FF", text: "#1D4ED8", border: "#BFDBFE" },
   admin: { bg: "#FDF4FF", text: "#7E22CE", border: "#E9D5FF" },
+  super_admin: { bg: "#FFFBEB", text: "#A16207", border: "#FDE68A" },
 };
 
 export const STATUS_LABELS = {

@@ -3,7 +3,7 @@ import { api } from "../api/client";
 import { Avatar, Badge, Btn, Card, SectionTitle, StatusBadge } from "../components/ui";
 import { ROLE_COLORS, ROLE_LABELS, STATUS_LABELS, T } from "../tokens";
 
-export function UserDetail({ user, onBack, onChanged }) {
+export function UserDetail({ user, currentAdmin, onBack, onChanged, onDeleted }) {
   const [current, setCurrent] = useState(user);
   const [role, setRole] = useState(user.role);
   const [history, setHistory] = useState([]);
@@ -38,6 +38,23 @@ export function UserDetail({ user, onBack, onChanged }) {
       setError(err.message);
     }
   };
+
+  const remove = async () => {
+    setError("");
+    try {
+      await api.deleteUser(current.id);
+      onDeleted?.();
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const isSelf = Number(current.id) === Number(currentAdmin?.id);
+  const targetIsAdmin = ["admin", "super_admin"].includes(current.role);
+  const canManageTargetAdmin = currentAdmin?.role === "super_admin";
+  const canDelete = !isSelf && (!targetIsAdmin || canManageTargetAdmin);
+  const canBlock = canDelete;
+  const canChangeRole = !isSelf && (!targetIsAdmin || canManageTargetAdmin);
 
   const statCards = [
     ["Проведено", current.stats?.organizedWorkouts || 0, T.accent],
@@ -119,8 +136,16 @@ export function UserDetail({ user, onBack, onChanged }) {
             <select value={role} onChange={e => setRole(e.target.value)} style={{ width: "100%", padding: 9, border: `1px solid ${T.border}`, borderRadius: T.radiusSm, marginBottom: 10 }}>
               <option value="member">Участник</option>
               <option value="admin">Администратор</option>
+              {(currentAdmin?.role === "super_admin" || role === "super_admin") && (
+                <option value="super_admin" disabled={currentAdmin?.role !== "super_admin"}>Супер-админ</option>
+              )}
             </select>
-            <Btn variant="primary" onClick={saveRole} style={{ width: "100%" }}>Сохранить роль</Btn>
+            <Btn variant="primary" onClick={saveRole} disabled={!canChangeRole} style={{ width: "100%" }}>Сохранить роль</Btn>
+            {!canChangeRole && (
+              <div style={{ marginTop: 8, color: T.textMuted, fontSize: 12 }}>
+                Свою роль менять нельзя. Админов может менять только супер-админ.
+              </div>
+            )}
           </Card>
 
           <Card>
@@ -136,7 +161,15 @@ export function UserDetail({ user, onBack, onChanged }) {
 
           <Card>
             <SectionTitle>Модерация</SectionTitle>
-            <Btn danger onClick={block} style={{ width: "100%" }}>Заблокировать</Btn>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <Btn danger onClick={block} disabled={!canBlock} style={{ width: "100%" }}>Заблокировать</Btn>
+              <Btn danger onClick={remove} disabled={!canDelete} style={{ width: "100%" }}>Удалить пользователя</Btn>
+            </div>
+            {!canDelete && (
+              <div style={{ marginTop: 8, color: T.textMuted, fontSize: 12 }}>
+                Админ не может удалить сам себя. Других админов может удалить только супер-админ.
+              </div>
+            )}
           </Card>
         </div>
       </div>

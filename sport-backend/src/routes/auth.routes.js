@@ -16,6 +16,11 @@ function normalizePhone(phone) {
   return value || null;
 }
 
+const NAME_RE = /^\p{L}{2,15}$/u;
+const LAST_NAME_RE = /^\p{L}{2,15}(?:-\p{L}{2,15})?$/u;
+const EMAIL_RE = /^[A-Za-z0-9._%+-]{2,64}@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
+const STRONG_PASSWORD_RE = /^(?=.*[a-zа-яё])(?=.*[A-ZА-ЯЁ])(?=.*\d)(?=.*[^A-Za-zА-Яа-яЁё0-9]).{8,}$/;
+
 authRouter.post("/register", async (req, res, next) => {
   try {
     const email = normalizeEmail(req.body.email);
@@ -26,8 +31,20 @@ authRouter.post("/register", async (req, res, next) => {
     const gender = String(req.body.gender || "").trim();
     const fullName = `${firstName} ${lastName}`.trim();
 
-    if (!email || !firstName || !lastName || !["male", "female", "other"].includes(gender) || password.length < 8) {
-      throw badRequest("Укажите фамилию, имя, пол, email и пароль от 8 символов");
+    if (!NAME_RE.test(firstName)) {
+      throw badRequest("Имя должно содержать только буквы, от 2 до 15 символов");
+    }
+    if (!LAST_NAME_RE.test(lastName)) {
+      throw badRequest("Фамилия должна содержать буквы от 2 до 15 символов. Двойная фамилия пишется через дефис");
+    }
+    if (!email || !EMAIL_RE.test(email)) {
+      throw badRequest("Некорректный email");
+    }
+    if (!["male", "female"].includes(gender)) {
+      throw badRequest("Укажите пол");
+    }
+    if (!STRONG_PASSWORD_RE.test(password)) {
+      throw badRequest("Пароль должен быть от 8 символов и содержать прописные, строчные буквы, цифры и символы");
     }
 
     const existing = await query(

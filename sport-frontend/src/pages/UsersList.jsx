@@ -35,6 +35,7 @@ export function UsersList({ onSelect }) {
           <option value="">Все роли</option>
           <option value="member">Участник</option>
           <option value="admin">Администратор</option>
+          <option value="super_admin">Супер-админ</option>
         </Select>
         <Select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
           <option value="">Все статусы</option>

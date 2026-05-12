@@ -41,7 +41,7 @@ export default function App() {
     return <Auth onAuth={setUser} />;
   }
 
-  if (user.role !== "admin") {
+  if (!["admin", "super_admin"].includes(user.role)) {
     return <UserApp user={user} onLogout={logout} />;
   }
 
@@ -58,7 +58,13 @@ export default function App() {
         {active === "Обзор" && <Overview setActive={handleSetActive} setSelectedUser={setSelectedUser} />}
         {active === "Пользователи" && !selectedUser && <UsersList onSelect={setSelectedUser} />}
         {active === "Пользователи" && selectedUser && (
-          <UserDetail user={selectedUser} onBack={() => setSelectedUser(null)} onChanged={setSelectedUser} />
+          <UserDetail
+            user={selectedUser}
+            currentAdmin={user}
+            onBack={() => setSelectedUser(null)}
+            onChanged={setSelectedUser}
+            onDeleted={() => setSelectedUser(null)}
+          />
         )}
         {active === "Тренировки" && <Workouts />}
         {active === "Настройки" && <Settings />}
