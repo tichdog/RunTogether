@@ -1,6 +1,6 @@
 # Sport Backend
 
-NodeJS + PostgreSQL backend for the collaborative training app.
+Next.js + PostgreSQL backend for the collaborative training app.
 
 ## Quick start
 
@@ -41,4 +41,10 @@ Seed admin:
 
 API base URL: `http://localhost:4000/api`
 
-Realtime free-place updates are emitted over Socket.IO as `workout:capacity`.
+## Runtime
+
+- API routes live in `src/app/api`.
+- Shared server-only code lives in `src/lib`.
+- Uploaded files are stored in `UPLOAD_DIR` and served from `/uploads/:file`.
+- Workout status sync and reminder creation are available at `POST /api/cron/workouts`.
+  Set `CRON_SECRET` and call the endpoint with `Authorization: Bearer <CRON_SECRET>` in production.

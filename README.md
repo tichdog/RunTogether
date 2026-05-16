@@ -4,7 +4,7 @@
 
 Проект состоит из двух частей:
 
-- `sport-backend` — NodeJS/Express API, PostgreSQL, JWT в httpOnly cookie.
+- `sport-backend` — Next.js API, PostgreSQL, JWT в httpOnly cookie.
 - `sport-frontend` — React frontend для админки и клиентского интерфейса.
 
 ## Требования

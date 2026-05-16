@@ -28,6 +28,7 @@ sport-frontend/frontend.err.log
 # Runtime uploads and temporary files
 uploads/
 sport-backend/uploads/
+sport-backend/public/uploads/
 tmp/
 temp/
 
