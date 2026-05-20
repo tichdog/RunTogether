@@ -10,7 +10,7 @@ const NAV_ITEMS = [
 
 export function Sidebar({ active, setActive, user, onLogout }) {
   return (
-    <aside style={{
+    <aside className="app-sidebar" style={{
       width: 220, background: T.sidebar, color: T.sidebarText,
       display: "flex", flexDirection: "column", flexShrink: 0,
       height: "100vh",

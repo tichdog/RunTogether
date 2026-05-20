@@ -21,15 +21,15 @@ export function UsersList({ onSelect }) {
   ), [users, search, roleFilter, statusFilter]);
 
   return (
-    <div style={{ padding: "32px 36px", flex: 1, overflowY: "auto", minWidth: 0 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 24 }}>
+    <div className="page users-list-page" style={{ padding: "32px 36px", flex: 1, overflowY: "auto", minWidth: 0 }}>
+      <div className="users-page-title" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 24 }}>
         <div>
           <h1 style={{ margin: 0, fontSize: 26, fontWeight: 800, color: T.text }}>Пользователи</h1>
           <p style={{ margin: "4px 0 0", fontSize: 13, color: T.textMuted }}>{filtered.length} записей</p>
         </div>
       </div>
 
-      <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
+      <div className="users-filter-row" style={{ display: "flex", gap: 8, marginBottom: 18 }}>
         <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Поиск по имени" style={{ flex: 1 }} />
         <Select value={roleFilter} onChange={e => setRoleFilter(e.target.value)}>
           <option value="">Все роли</option>
@@ -47,21 +47,21 @@ export function UsersList({ onSelect }) {
       {error && <div style={{ color: T.danger, marginBottom: 16, fontSize: 13 }}>{error}</div>}
 
       <Card style={{ padding: 0, overflow: "hidden" }}>
-        <div style={headerGrid}>
+        <div className="users-list-header" style={headerGrid}>
           {["№", "Пользователь", "Email", "Роль", "Статус", "Верификация"].map(h => <div key={h}>{h}</div>)}
         </div>
 
         {filtered.map((user, i) => (
-          <div key={user.id} onClick={() => onSelect(user)} style={rowGrid(i, filtered.length)}>
-            <span style={{ fontSize: 12, color: T.textHint, fontWeight: 700 }}>{user.id}</span>
-            <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+          <div key={user.id} className="user-row" onClick={() => onSelect(user)} style={rowGrid(i, filtered.length)}>
+            <span className="user-cell user-cell-id" style={{ fontSize: 12, color: T.textHint, fontWeight: 700 }}>{user.id}</span>
+            <div className="user-cell user-cell-user" style={{ display: "flex", alignItems: "center", gap: 9 }}>
               <Avatar initials={user.initials} src={user.avatarUrl} size={28} />
-              <span style={{ fontSize: 13, fontWeight: 700, color: T.text }}>{user.name}</span>
+              <span className="user-name" style={{ fontSize: 13, fontWeight: 700, color: T.text }}>{user.name}</span>
             </div>
-            <span style={{ fontSize: 13, color: T.textMuted }}>{user.email || "скрыто"}</span>
-            <Badge text={ROLE_LABELS[user.role]} colors={ROLE_COLORS[user.role]} />
-            <StatusBadge status={user.status} />
-            <span style={{ fontSize: 12, color: user.phoneVerified ? T.success : T.textHint, fontWeight: 600 }}>
+            <span className="user-cell user-cell-email" style={{ fontSize: 13, color: T.textMuted }}>{user.email || "скрыто"}</span>
+            <div className="user-cell user-cell-role"><Badge text={ROLE_LABELS[user.role]} colors={ROLE_COLORS[user.role]} /></div>
+            <div className="user-cell user-cell-status"><StatusBadge status={user.status} /></div>
+            <span className="user-cell user-cell-verified" style={{ fontSize: 12, color: user.phoneVerified ? T.success : T.textHint, fontWeight: 600 }}>
               {STATUS_LABELS[user.verified] || user.verified}
             </span>
           </div>

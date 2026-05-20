@@ -218,24 +218,81 @@ export function UserApp({ user, onLogout }) {
 
   return (
     <div className="rt-stage">
-      <div className="rt-phone" data-screen={screen}>
-        {!isAuthScreen && hasContextTopbar && (
-          <header className="rt-topbar">
-            <button className="icon-btn" type="button" aria-label="Назад" onClick={handleTopbarBack}>
-              <Icon name="arrow" />
+      {!isAuthScreen && (
+        <nav className="desktop-navbar">
+          <div className="navbar-brand">
+            <strong>RunTogether</strong>
+          </div>
+          <div className="navbar-items">
+            <button
+              className={`navbar-item ${activeTab === "home" ? "active" : ""}`}
+              onClick={() => goTab("home")}
+              type="button"
+            >
+              <Icon name="home" />
+              <span>Главная</span>
             </button>
-            <span>{screenTitles[screen]}</span>
-            <button className="avatar-btn" type="button" onClick={() => goTab("profile")} aria-label="Профиль">
-              {currentUser.initials || "A"}
+            <button
+              className={`navbar-item ${activeTab === "workouts" ? "active" : ""}`}
+              onClick={() => goTab("workouts")}
+              type="button"
+            >
+              <Icon name="runner" />
+              <span>Тренировки</span>
             </button>
-          </header>
-        )}
+            <button
+              className={`navbar-item ${activeTab === "create" ? "active" : ""}`}
+              onClick={() => goTab("create")}
+              type="button"
+            >
+              <Icon name="plus" />
+              <span>Создать</span>
+            </button>
+            <button
+              className={`navbar-item ${activeTab === "profile" ? "active" : ""}`}
+              onClick={() => goTab("profile")}
+              type="button"
+            >
+              <Icon name="users" />
+              <span>Профиль</span>
+            </button>
+          </div>
+          <div className="navbar-bottom">
+            <div className="navbar-user">
+              <span className="navbar-user-name">{currentUser.name}</span>
+              <span className="navbar-user-role">Пользователь</span>
+            </div>
+            <button
+              className="primary-wide"
+              onClick={signOut}
+              type="button"
+              style={{ width: "100%", minHeight: 38, fontSize: 12 }}
+            >
+              Выйти
+            </button>
+          </div>
+        </nav>
+      )}
+      <div className={`${!isAuthScreen ? "phone-wrapper" : ""}`}>
+        <div className="rt-phone" data-screen={screen}>
+          {!isAuthScreen && hasContextTopbar && (
+            <header className="rt-topbar">
+              <button className="icon-btn" type="button" aria-label="Назад" onClick={handleTopbarBack}>
+                <Icon name="arrow" />
+              </button>
+              <span>{screenTitles[screen]}</span>
+              <button className="avatar-btn" type="button" onClick={() => goTab("profile")} aria-label="Профиль">
+                {currentUser.initials || "A"}
+              </button>
+            </header>
+          )}
 
-        <main className="rt-screen">{renderScreen()}</main>
+          <main className="rt-screen">{renderScreen()}</main>
 
-        {showBottomNav && (
-          <BottomNav active={activeTab} onChange={goTab} />
-        )}
+          {showBottomNav && (
+            <BottomNav active={activeTab} onChange={goTab} />
+          )}
+        </div>
       </div>
     </div>
   );

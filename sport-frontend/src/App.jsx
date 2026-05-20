@@ -46,7 +46,7 @@ export default function App() {
   }
 
   return (
-    <div style={{
+    <div className="app-shell" style={{
       display: "flex", height: "100vh", width: "100%",
       fontFamily: "'Inter', 'Segoe UI', sans-serif",
       background: T.bg, color: T.text,
@@ -54,7 +54,7 @@ export default function App() {
     }}>
       <Sidebar active={active} setActive={handleSetActive} user={user} onLogout={logout} />
 
-      <main style={{ flex: 1, display: "flex", flexDirection: "column", overflowY: "auto", background: T.bg }}>
+      <main className="app-main" style={{ flex: 1, display: "flex", flexDirection: "column", overflowY: "auto", background: T.bg }}>
         {active === "Обзор" && <Overview setActive={handleSetActive} setSelectedUser={setSelectedUser} />}
         {active === "Пользователи" && !selectedUser && <UsersList onSelect={setSelectedUser} />}
         {active === "Пользователи" && selectedUser && (

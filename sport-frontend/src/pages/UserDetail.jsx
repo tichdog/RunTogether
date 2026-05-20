@@ -64,17 +64,15 @@ export function UserDetail({ user, currentAdmin, onBack, onChanged, onDeleted })
   ];
 
   return (
-    <div style={{ padding: "32px 36px", flex: 1, overflowY: "auto", minWidth: 0 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 26 }}>
+    <div className="page user-detail-page" style={{ padding: "32px 36px", flex: 1, overflowY: "auto", minWidth: 0 }}>
+      <div className="user-detail-topbar" style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 26 }}>
         <Btn onClick={onBack}>Назад</Btn>
         <div style={{ fontSize: 13, color: T.textMuted }}>
           Пользователи / <strong style={{ color: T.text }}>{current.name}</strong>
         </div>
       </div>
 
-      {error && <div style={{ color: T.danger, marginBottom: 16, fontSize: 13 }}>{error}</div>}
-
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 300px", gap: 18 }}>
+      <div className="user-detail-grid" style={{ display: "grid", gridTemplateColumns: "1fr 300px", gap: 18 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
           <Card>
             <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 20 }}>
