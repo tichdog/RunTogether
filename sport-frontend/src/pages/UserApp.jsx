@@ -1,650 +1,879 @@
-import { useEffect, useMemo, useState } from "react";
-import { api } from "../api/client";
+import { useMemo, useState } from "react";
 import "../styles/user-app.css";
 
-const INITIAL_WORKOUT = {
-  title: "",
-  startAt: "",
-  meetingName: "",
-  meetingAddress: "",
-  routeName: "",
-  distanceKm: 5,
-  paceMinPerKm: 6,
-  difficulty: "easy",
-  participantLimit: 10,
+const demoUser = {
+  firstName: "Алина",
+  lastName: "К",
+  name: "Алина К",
+  initials: "А",
+};
+
+const workoutsSeed = [
+  {
+    id: 1,
+    title: "Парк",
+    subtitle: "Парк - Сб 12:00",
+    date: "Сегодня, 10:00",
+    distance: "3.2 км",
+    pace: "6-7 км/ч",
+    paceShort: "6-7",
+    level: "Средний",
+    places: "3/10 мест",
+    organizer: "Aaa User",
+    organizerInitial: "A",
+    rating: "4.7",
+    status: "open",
+  },
+  {
+    id: 2,
+    title: "Парк",
+    subtitle: "Парк - Вс 16:00",
+    date: "Сегодня, 10:00",
+    distance: "3.2 км",
+    pace: "6-7 км/ч",
+    paceShort: "6-7",
+    level: "Легкий",
+    places: "5/10 мест",
+    organizer: "A User",
+    organizerInitial: "A",
+    rating: "4.7",
+    status: "open",
+  },
+  {
+    id: 3,
+    title: "Набережная",
+    subtitle: "Набережная - Завтра 08:00",
+    date: "Завтра, 08:00",
+    distance: "7.4 км",
+    pace: "5-6 км/ч",
+    paceShort: "5-6",
+    level: "Сложный",
+    places: "8/12 мест",
+    organizer: "Мария Л",
+    organizerInitial: "М",
+    rating: "4.9",
+    status: "open",
+  },
+];
+
+const requestSeed = [
+  { id: 1, name: "Анна М", meta: "10 тренировок, рейтинг 4.8", status: "pending" },
+  { id: 2, name: "Игорь С", meta: "3 тренировки, рейтинг 4.5", status: "pending" },
+  { id: 3, name: "Оля Р", meta: "18 тренировок, рейтинг 4.9", status: "confirmed" },
+];
+
+const screenTitles = {
+  login: "Вход",
+  register: "Регистрация",
+  recover: "Восстановление",
+  home: "Главная",
+  workouts: "Тренировки",
+  detail: "Инфо тренировки",
+  tracking: "Процесс тренировки",
+  rating: "Оценка",
+  create: "Создание тренировки",
+  route: "Создание маршрута",
+  organizer: "Вы организатор",
+  requests: "Заявки",
+  chat: "Чат",
+  profile: "Профиль",
 };
 
 export function UserApp({ user, onLogout }) {
-  const [localUser, setLocalUser] = useState(user);
+  const [screen, setScreen] = useState(user ? "home" : "login");
   const [activeTab, setActiveTab] = useState("home");
-  const [workouts, setWorkouts] = useState([]);
-  const [notifications, setNotifications] = useState([]);
-  const [selectedWorkout, setSelectedWorkout] = useState(null);
-  const [query, setQuery] = useState("");
-  const [difficulty, setDifficulty] = useState("");
-  const [message, setMessage] = useState("");
-  const [workoutForm, setWorkoutForm] = useState(INITIAL_WORKOUT);
-  const [profileForm, setProfileForm] = useState({
-    firstName: user.firstName || "",
-    lastName: user.lastName || "",
-    gender: user.gender || "male",
-    phone: user.phone || "",
-    hideEmail: Boolean(user.privacy?.hide_email),
-    hidePhone: Boolean(user.privacy?.hide_phone),
-  });
+  const [selectedWorkout, setSelectedWorkout] = useState(workoutsSeed[0]);
+  const [joined, setJoined] = useState(false);
+  const [requests, setRequests] = useState(requestSeed);
+  const [createdWorkout, setCreatedWorkout] = useState(false);
+  const [authMode, setAuthMode] = useState("login");
+  const [routePoints, setRoutePoints] = useState([
+    { x: 14, y: 22 },
+    { x: 28, y: 70 },
+    { x: 84, y: 62 },
+  ]);
 
-  const loadWorkouts = () => {
-    api.workouts({ difficulty })
-      .then(data => setWorkouts(data.workouts))
-      .catch(err => setMessage(err.message));
+  const currentUser = user || demoUser;
+  const selected = selectedWorkout || workoutsSeed[0];
+  const isAuthScreen = ["login", "register", "recover"].includes(screen);
+  const hasContextTopbar = !["home", "workouts", "profile", "tracking", "rating", "chat", "organizer", "requests"].includes(screen);
+  const showBottomNav = !["login", "register", "recover", "tracking", "rating", "chat"].includes(screen);
+
+  const openWorkout = (workout) => {
+    setSelectedWorkout(workout);
+    setScreen("detail");
   };
 
-  useEffect(() => {
-    loadWorkouts();
-  }, [difficulty]);
+  const goTab = (tab) => {
+    setActiveTab(tab);
+    setScreen(tab);
+  };
 
-  useEffect(() => {
-    api.notifications()
-      .then(data => setNotifications(data.notifications))
-      .catch(() => setNotifications([]));
-  }, []);
+  const signIn = () => {
+    setAuthMode("login");
+    setScreen("home");
+    setActiveTab("home");
+  };
 
-  const filteredWorkouts = useMemo(() => {
-    const text = query.trim().toLowerCase();
-    return workouts.filter(workout => {
-      const matchesText = !text ||
-        workout.title.toLowerCase().includes(text) ||
-        workout.organizerName?.toLowerCase().includes(text) ||
-        workout.meetingPoint?.name?.toLowerCase().includes(text);
-      return matchesText;
-    });
-  }, [workouts, query]);
+  const signOut = () => {
+    onLogout?.();
+    setScreen("login");
+    setActiveTab("home");
+    setJoined(false);
+  };
 
-  const upcoming = filteredWorkouts.filter(workout => ["planned", "open", "full"].includes(workout.status));
-  const featuredWorkout = upcoming[0] || filteredWorkouts[0];
+  const publishWorkout = () => {
+    setCreatedWorkout(true);
+    setSelectedWorkout(workoutsSeed[0]);
+    setScreen("organizer");
+    setActiveTab("create");
+  };
 
-  const stats = [
-    { label: "Посещено", value: localUser.stats?.attendedWorkouts || 0 },
-    { label: "Км всего", value: localUser.stats?.distance || 0 },
-    { label: "Рейтинг", value: localUser.stats?.rating || "0.0" },
-  ];
+  const updateRequest = (id, status) => {
+    setRequests(prev => prev.map(item => item.id === id ? { ...item, status } : item));
+  };
 
-  const joinWorkout = async (workout) => {
-    setMessage("");
-    try {
-      await api.joinWorkout(workout.id);
-      setMessage("Заявка отправлена организатору");
-      loadWorkouts();
-    } catch (err) {
-      setMessage(err.message);
+  const handleTopbarBack = () => {
+    if (screen === "route") {
+      setScreen("create");
+      return;
     }
-  };
-
-  const createWorkout = async (event) => {
-    event.preventDefault();
-    setMessage("");
-    try {
-      await api.createWorkout({
-        title: workoutForm.title,
-        startAt: workoutForm.startAt,
-        meetingPoint: {
-          name: workoutForm.meetingName,
-          address: workoutForm.meetingAddress,
-        },
-        route: { name: workoutForm.routeName },
-        distanceKm: Number(workoutForm.distanceKm),
-        paceMinPerKm: Number(workoutForm.paceMinPerKm),
-        difficulty: workoutForm.difficulty,
-        participantLimit: Number(workoutForm.participantLimit),
-      });
-      setWorkoutForm(INITIAL_WORKOUT);
-      setActiveTab("workouts");
-      setMessage("Тренировка создана");
-      loadWorkouts();
-    } catch (err) {
-      setMessage(err.message);
+    if (screen === "detail") {
+      goTab(activeTab === "workouts" ? "workouts" : "home");
+      return;
     }
+    goTab("home");
   };
 
-  const saveProfile = async (event) => {
-    event.preventDefault();
-    setMessage("");
-    try {
-      const data = await api.updateMe({
-        firstName: profileForm.firstName,
-        lastName: profileForm.lastName,
-        gender: profileForm.gender,
-        phone: profileForm.phone,
-        privacy: {
-          hide_email: profileForm.hideEmail,
-          hide_phone: profileForm.hidePhone,
-        },
-      });
-      setLocalUser(data.user);
-      setMessage("Профиль сохранен");
-    } catch (err) {
-      setMessage(err.message);
+  const addRoutePoint = () => {
+    const next = [
+      { x: 18, y: 18 },
+      { x: 30, y: 68 },
+      { x: 86, y: 60 },
+      { x: 66, y: 28 },
+    ];
+    setRoutePoints(prev => prev.length >= next.length ? next.slice(0, 3) : next.slice(0, prev.length + 1));
+  };
+
+  const renderScreen = () => {
+    if (screen === "login" || screen === "register" || screen === "recover") {
+      return (
+        <AuthMock
+          mode={authMode}
+          setMode={(mode) => {
+            setAuthMode(mode);
+            setScreen(mode);
+          }}
+          onSubmit={signIn}
+        />
+      );
     }
-  };
 
-  const setWorkout = key => event => setWorkoutForm(prev => ({ ...prev, [key]: event.target.value }));
-  const setProfile = key => event => setProfileForm(prev => ({ ...prev, [key]: event.target.value }));
-  const toggleProfile = key => event => setProfileForm(prev => ({ ...prev, [key]: event.target.checked }));
+    if (screen === "home") {
+      return <HomeScreen user={currentUser} onOpen={openWorkout} onCreate={() => goTab("create")} onProfile={() => goTab("profile")} />;
+    }
+
+    if (screen === "workouts") {
+      return <WorkoutsScreen workouts={workoutsSeed} onOpen={openWorkout} />;
+    }
+
+    if (screen === "detail") {
+      return <WorkoutDetail workout={selected} joined={joined} onJoin={() => setJoined(true)} onChat={() => setScreen("chat")} onTrack={() => setScreen("tracking")} />;
+    }
+
+    if (screen === "tracking") {
+      return <TrackingScreen workout={selected} onFinish={() => setScreen("rating")} />;
+    }
+
+    if (screen === "rating") {
+      return <RatingScreen onDone={() => goTab("home")} />;
+    }
+
+    if (screen === "create") {
+      return <CreateWorkoutScreen onNext={() => setScreen("route")} />;
+    }
+
+    if (screen === "route") {
+      return <RouteScreen points={routePoints} addPoint={addRoutePoint} onPublish={publishWorkout} />;
+    }
+
+    if (screen === "organizer") {
+      return <OrganizerScreen workout={selected} created={createdWorkout} onRequests={() => setScreen("requests")} onChat={() => setScreen("chat")} />;
+    }
+
+    if (screen === "requests") {
+      return <RequestsScreen requests={requests} onBack={() => setScreen("organizer")} onUpdate={updateRequest} />;
+    }
+
+    if (screen === "chat") {
+      return <ChatScreen workout={selected} onBack={() => setScreen(activeTab === "create" ? "organizer" : "detail")} />;
+    }
+
+    if (screen === "profile") {
+      return <ProfileScreen user={currentUser} onLogout={signOut} />;
+    }
+
+    return null;
+  };
 
   return (
-    <div className="client-app">
-      <aside className="client-sidebar" aria-label="Разделы приложения">
-        <div className="client-brand">
-          <span>R</span>
-          <strong>RunTogether</strong>
-        </div>
-        <ClientNav activeTab={activeTab} setActiveTab={setActiveTab} />
-        <button className="client-logout" type="button" onClick={onLogout}>Выйти</button>
-      </aside>
-
-      <main className="client-main">
-        <header className="client-header">
-          <div>
-            <p className="client-kicker">Совместные тренировки</p>
-            <h1>{pageTitle(activeTab, selectedWorkout)}</h1>
+    <div className="rt-stage">
+      {!isAuthScreen && (
+        <nav className="desktop-navbar">
+          <div className="navbar-brand">
+            <strong>RunTogether</strong>
           </div>
-          <button className="client-avatar" type="button" onClick={() => setActiveTab("profile")} aria-label="Открыть профиль">
-            {initials(localUser)}
-          </button>
-        </header>
-
-        {message && (
-          <div className={message.includes("сохран") || message.includes("создан") || message.includes("отправ") ? "client-alert success" : "client-alert"}>
-            {message}
-          </div>
-        )}
-
-        {selectedWorkout ? (
-          <WorkoutDetail workout={selectedWorkout} onBack={() => setSelectedWorkout(null)} onJoin={joinWorkout} />
-        ) : (
-          <>
-            {activeTab === "home" && (
-              <HomeView
-                user={localUser}
-                stats={stats}
-                featuredWorkout={featuredWorkout}
-                workouts={upcoming}
-                notifications={notifications}
-                onOpenWorkout={setSelectedWorkout}
-                onCreate={() => setActiveTab("create")}
-              />
-            )}
-
-            {activeTab === "workouts" && (
-              <WorkoutsView
-                workouts={filteredWorkouts}
-                query={query}
-                setQuery={setQuery}
-                difficulty={difficulty}
-                setDifficulty={setDifficulty}
-                onOpenWorkout={setSelectedWorkout}
-                onJoin={joinWorkout}
-              />
-            )}
-
-            {activeTab === "create" && (
-              <CreateWorkoutView
-                form={workoutForm}
-                setField={setWorkout}
-                onSubmit={createWorkout}
-              />
-            )}
-
-            {activeTab === "profile" && (
-              <ProfileView
-                user={localUser}
-                form={profileForm}
-                setField={setProfile}
-                toggleField={toggleProfile}
-                onSubmit={saveProfile}
-                notifications={notifications}
-              />
-            )}
-          </>
-        )}
-      </main>
-
-      <nav className="client-bottom-nav" aria-label="Мобильная навигация">
-        <ClientNav activeTab={activeTab} setActiveTab={setActiveTab} compact />
-      </nav>
-    </div>
-  );
-}
-
-function ClientNav({ activeTab, setActiveTab, compact = false }) {
-  const items = [
-    ["home", "Главная"],
-    ["workouts", "Тренировки"],
-    ["create", "Создать"],
-    ["profile", "Профиль"],
-  ];
-
-  return (
-    <div className={compact ? "client-nav compact" : "client-nav"}>
-      {items.map(([id, label]) => (
-        <button
-          key={id}
-          type="button"
-          className={activeTab === id ? "active" : ""}
-          onClick={() => setActiveTab(id)}
-        >
-          <span className="nav-mark" />
-          {label}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-function HomeView({ user, stats, featuredWorkout, workouts, notifications, onOpenWorkout, onCreate }) {
-  return (
-    <div className="client-grid">
-      <section className="client-hero">
-        <div>
-          <p>Привет, {user.firstName || user.name}</p>
-          <h2>Найди ближайшую тренировку или собери свою группу</h2>
-        </div>
-        <button type="button" onClick={onCreate}>Создать тренировку</button>
-      </section>
-
-      <section className="client-stats">
-        {stats.map(stat => (
-          <article key={stat.label} className="client-stat">
-            <strong>{stat.value}</strong>
-            <span>{stat.label}</span>
-          </article>
-        ))}
-      </section>
-
-      <section className="client-panel main-panel">
-        <div className="panel-head">
-          <div>
-            <p>Рекомендация</p>
-            <h2>Ближайшая тренировка</h2>
-          </div>
-        </div>
-        {featuredWorkout ? (
-          <WorkoutCard workout={featuredWorkout} onOpen={onOpenWorkout} highlight />
-        ) : (
-          <EmptyBlock text="Пока нет тренировок с открытым набором." />
-        )}
-      </section>
-
-      <section className="client-panel">
-        <div className="panel-head">
-          <div>
-            <p>Лента</p>
-            <h2>Скоро стартуют</h2>
-          </div>
-        </div>
-        <div className="compact-list">
-          {workouts.slice(0, 4).map(workout => (
-            <button key={workout.id} type="button" onClick={() => onOpenWorkout(workout)}>
-              <span>{workout.title}</span>
-              <small>{formatDate(workout.startAt)}</small>
+          <div className="navbar-items">
+            <button
+              className={`navbar-item ${activeTab === "home" ? "active" : ""}`}
+              onClick={() => goTab("home")}
+              type="button"
+            >
+              <Icon name="home" />
+              <span>Главная</span>
             </button>
-          ))}
-          {!workouts.length && <EmptyBlock text="Нет ближайших тренировок." />}
-        </div>
-      </section>
-
-      <section className="client-panel">
-        <div className="panel-head">
-          <div>
-            <p>Система</p>
-            <h2>Уведомления</h2>
+            <button
+              className={`navbar-item ${activeTab === "workouts" ? "active" : ""}`}
+              onClick={() => goTab("workouts")}
+              type="button"
+            >
+              <Icon name="runner" />
+              <span>Тренировки</span>
+            </button>
+            <button
+              className={`navbar-item ${activeTab === "create" ? "active" : ""}`}
+              onClick={() => goTab("create")}
+              type="button"
+            >
+              <Icon name="plus" />
+              <span>Создать</span>
+            </button>
+            <button
+              className={`navbar-item ${activeTab === "profile" ? "active" : ""}`}
+              onClick={() => goTab("profile")}
+              type="button"
+            >
+              <Icon name="users" />
+              <span>Профиль</span>
+            </button>
           </div>
+          <div className="navbar-bottom">
+            <div className="navbar-user">
+              <span className="navbar-user-name">{currentUser.name}</span>
+              <span className="navbar-user-role">Пользователь</span>
+            </div>
+            <button
+              className="primary-wide"
+              onClick={signOut}
+              type="button"
+              style={{ width: "100%", minHeight: 38, fontSize: 12 }}
+            >
+              Выйти
+            </button>
+          </div>
+        </nav>
+      )}
+      <div className={`${!isAuthScreen ? "phone-wrapper" : ""}`}>
+        <div className="rt-phone" data-screen={screen}>
+          {!isAuthScreen && hasContextTopbar && (
+            <header className="rt-topbar">
+              <button className="icon-btn" type="button" aria-label="Назад" onClick={handleTopbarBack}>
+                <Icon name="arrow" />
+              </button>
+              <span>{screenTitles[screen]}</span>
+              <button className="avatar-btn" type="button" onClick={() => goTab("profile")} aria-label="Профиль">
+                {currentUser.initials || "A"}
+              </button>
+            </header>
+          )}
+
+          <main className="rt-screen">{renderScreen()}</main>
+
+          {showBottomNav && (
+            <BottomNav active={activeTab} onChange={goTab} />
+          )}
         </div>
-        <div className="notification-list">
-          {notifications.slice(0, 4).map(item => (
-            <article key={item.id}>
-              <strong>{item.title}</strong>
-              <span>{item.message}</span>
-            </article>
-          ))}
-          {!notifications.length && <EmptyBlock text="Новых уведомлений нет." />}
-        </div>
-      </section>
+      </div>
     </div>
   );
 }
 
-function WorkoutsView({ workouts, query, setQuery, difficulty, setDifficulty, onOpenWorkout, onJoin }) {
-  return (
-    <section className="client-panel full-panel">
-      <div className="filters-row">
-        <label>
-          <span>Поиск</span>
-          <input value={query} onChange={event => setQuery(event.target.value)} placeholder="Название, место, организатор" />
-        </label>
-        <label>
-          <span>Сложность</span>
-          <select value={difficulty} onChange={event => setDifficulty(event.target.value)}>
-            <option value="">Любая</option>
-            <option value="easy">Легкая</option>
-            <option value="medium">Средняя</option>
-            <option value="hard">Сложная</option>
-          </select>
-        </label>
-      </div>
+function AuthMock({ mode, setMode, onSubmit }) {
+  const isLogin = mode === "login";
+  const isRegister = mode === "register";
 
-      <div className="workout-list">
-        {workouts.map(workout => (
-          <WorkoutCard key={workout.id} workout={workout} onOpen={onOpenWorkout} onJoin={onJoin} />
-        ))}
-        {!workouts.length && <EmptyBlock text="Тренировки не найдены." />}
+  return (
+    <section className="auth-mock">
+      <div className="auth-orb">R</div>
+      <h1>RunTogether</h1>
+      <p>{isLogin ? "Вход" : isRegister ? "Создать аккаунт" : "Восстановить пароль"}</p>
+
+      <form className="mock-form" onSubmit={(event) => {
+        event.preventDefault();
+        onSubmit();
+      }}>
+        {isRegister && (
+          <div className="field-row">
+            <label>
+              <span>Имя</span>
+              <input defaultValue="Алина" />
+            </label>
+            <label>
+              <span>Фамилия</span>
+              <input defaultValue="К" />
+            </label>
+          </div>
+        )}
+        <label>
+          <span>Email</span>
+          <input type="email" defaultValue="runner@mail.ru" />
+        </label>
+        {!mode.includes("recover") && (
+          <label>
+            <span>Пароль</span>
+            <input type="password" defaultValue="runner123" />
+          </label>
+        )}
+        {isRegister && (
+          <label className="check-line">
+            <input type="checkbox" defaultChecked />
+            <span>Скрывать телефон и email в публичном профиле</span>
+          </label>
+        )}
+        <button className="primary-wide" type="submit">
+          {isLogin ? "Войти" : isRegister ? "Зарегистрироваться" : "Отправить ссылку"}
+        </button>
+      </form>
+
+      <div className="auth-links">
+        <button type="button" onClick={() => setMode(isLogin ? "register" : "login")}>
+          {isLogin ? "Регистрация" : "Уже есть аккаунт"}
+        </button>
+        <button type="button" onClick={() => setMode("recover")}>Забыли пароль?</button>
       </div>
     </section>
   );
 }
 
-function CreateWorkoutView({ form, setField, onSubmit }) {
+function HomeScreen({ user, onOpen, onCreate, onProfile }) {
   return (
-    <section className="client-panel full-panel">
-      <form className="client-form" onSubmit={onSubmit}>
-        <div className="form-grid two">
-          <label>
-            <span>Название</span>
-            <input value={form.title} onChange={setField("title")} placeholder="Например, утренний кросс" required />
-          </label>
-          <label>
-            <span>Дата и время</span>
-            <input value={form.startAt} onChange={setField("startAt")} type="datetime-local" required />
-          </label>
+    <section className="content-pad home-screen">
+      <div className="home-head">
+        <div>
+          <p>Добро пожаловать!</p>
+          <strong>{user.name}</strong>
         </div>
+        <button className="home-avatar" type="button" onClick={onProfile}>{user.initials || "A"}</button>
+      </div>
 
-        <div className="form-grid two">
-          <label>
-            <span>Точка сбора</span>
-            <input value={form.meetingName} onChange={setField("meetingName")} placeholder="Парк, стадион, метро" required />
-          </label>
-          <label>
-            <span>Адрес</span>
-            <input value={form.meetingAddress} onChange={setField("meetingAddress")} placeholder="Необязательно" />
-          </label>
-        </div>
+      <StatsRow />
 
-        <label>
-          <span>Маршрут</span>
-          <input value={form.routeName} onChange={setField("routeName")} placeholder="Короткое описание маршрута" required />
+      <div className="section-title">Тренировки</div>
+      <WorkoutCard workout={workoutsSeed[0]} onOpen={() => onOpen(workoutsSeed[0])} />
+      <WorkoutCard workout={workoutsSeed[1]} onOpen={() => onOpen(workoutsSeed[1])} compact />
+
+      <button className="secondary-wide" type="button" onClick={onCreate}>Создать тренировку</button>
+    </section>
+  );
+}
+
+function WorkoutsScreen({ workouts, onOpen }) {
+  const [query, setQuery] = useState("");
+  const [level, setLevel] = useState("Все");
+
+  const filtered = useMemo(() => workouts.filter(workout => {
+    const matchesText = workout.subtitle.toLowerCase().includes(query.trim().toLowerCase());
+    const matchesLevel = level === "Все" || workout.level === level;
+    return matchesText && matchesLevel;
+  }), [query, level, workouts]);
+
+  return (
+    <section className="content-pad workouts-screen">
+      <div className="filter-row">
+        <label className="search-field">
+          <Icon name="search" />
+          <input value={query} onChange={event => setQuery(event.target.value)} placeholder="Поиск" />
         </label>
+        <button className="filter-btn" type="button" aria-label="Фильтр">
+          <Icon name="filter" />
+        </button>
+      </div>
+      <div className="chip-row">
+        {["Все", "Легкий", "Средний", "Сложный"].map(item => (
+          <button className={level === item ? "chip active" : "chip"} type="button" key={item} onClick={() => setLevel(item)}>
+            {item}
+          </button>
+        ))}
+      </div>
+      {filtered.map(workout => (
+        <WorkoutCard key={workout.id} workout={workout} onOpen={() => onOpen(workout)} />
+      ))}
+      {!filtered.length && <div className="empty-state">Тренировки не найдены</div>}
+    </section>
+  );
+}
 
-        <div className="form-grid four">
-          <label>
-            <span>Дистанция, км</span>
-            <input value={form.distanceKm} onChange={setField("distanceKm")} type="number" min="1" step="0.1" required />
-          </label>
-          <label>
-            <span>Темп, мин/км</span>
-            <input value={form.paceMinPerKm} onChange={setField("paceMinPerKm")} type="number" min="1" step="0.1" required />
-          </label>
-          <label>
-            <span>Сложность</span>
-            <select value={form.difficulty} onChange={setField("difficulty")}>
-              <option value="easy">Легкая</option>
-              <option value="medium">Средняя</option>
-              <option value="hard">Сложная</option>
-            </select>
-          </label>
-          <label>
-            <span>Лимит</span>
-            <input value={form.participantLimit} onChange={setField("participantLimit")} type="number" min="1" required />
-          </label>
+function WorkoutDetail({ workout, joined, onJoin, onChat, onTrack }) {
+  return (
+    <section className="detail-screen">
+      <RouteMap variant="loop" />
+      <div className="detail-body">
+        <div className="detail-title">
+          <h1>{workout.title}</h1>
+          <strong>{workout.places}</strong>
         </div>
+        <InfoGrid workout={workout} />
+        <Participants />
+        <Organizer workout={workout} />
+        <div className="action-grid">
+          <button className="soft-action" type="button" onClick={onChat}>
+            <Icon name="chat" />
+            Чат
+          </button>
+          <button className={joined ? "soft-action confirmed" : "primary-action"} type="button" onClick={joined ? onTrack : onJoin}>
+            {joined ? "Начать" : "Подать заявку"}
+          </button>
+        </div>
+      </div>
+    </section>
+  );
+}
 
-        <button className="primary-action" type="submit">Опубликовать тренировку</button>
+function TrackingScreen({ workout, onFinish }) {
+  const [paused, setPaused] = useState(false);
+
+  return (
+    <section className="tracking-screen">
+      <RouteMap variant="track" />
+      <div className="tracking-panel">
+        <div className="distance-main">
+          <strong>2.2</strong>
+          <span>километров</span>
+        </div>
+        <div className="tracking-metrics">
+          <Metric value="30:00" label="Время" />
+          <Metric value={workout.distance} label="Дистанция" />
+          <Metric value={workout.paceShort} label="Темп/км" />
+        </div>
+        <Organizer workout={workout} small />
+        <div className="tracking-actions">
+          <button className="round-control" type="button" onClick={() => setPaused(prev => !prev)} aria-label={paused ? "Продолжить" : "Пауза"}>
+            <Icon name={paused ? "play" : "pause"} />
+          </button>
+          <button className="primary-action" type="button" onClick={onFinish}>Завершить</button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function RatingScreen({ onDone }) {
+  const [organizerStars, setOrganizerStars] = useState(0);
+  const [workoutStars, setWorkoutStars] = useState(0);
+
+  return (
+    <section className="content-pad rating-screen">
+      <h1>Оцените тренировку</h1>
+      <RatingLine label="Организатор" value={organizerStars} onChange={setOrganizerStars} />
+      <RatingLine label="Тренировка" value={workoutStars} onChange={setWorkoutStars} />
+      <label className="comment-field">
+        <span>Комментарий</span>
+        <textarea rows={5} />
+      </label>
+      <button className="soft-action menu-action" type="button" onClick={onDone}>В меню</button>
+    </section>
+  );
+}
+
+function CreateWorkoutScreen({ onNext }) {
+  return (
+    <section className="content-pad create-screen">
+      <form className="create-form" onSubmit={(event) => {
+        event.preventDefault();
+        onNext();
+      }}>
+        <label className="wide">
+          <span>Название</span>
+          <input defaultValue="Парк" />
+        </label>
+        <label>
+          <span>Дата</span>
+          <input defaultValue="10 марта" />
+        </label>
+        <label>
+          <span>Время</span>
+          <input defaultValue="12:00" />
+        </label>
+        <label>
+          <span>Темп</span>
+          <input defaultValue="6 км/ч" />
+        </label>
+        <label>
+          <span>Уровень</span>
+          <select defaultValue="Средний">
+            <option>Легкий</option>
+            <option>Средний</option>
+            <option>Сложный</option>
+          </select>
+        </label>
+        <label>
+          <span>Лимит человек</span>
+          <input defaultValue="10" />
+        </label>
+        <label>
+          <span>Сложность</span>
+          <input defaultValue="3/5" />
+        </label>
+        <label className="wide">
+          <span>Комментарий</span>
+          <textarea rows={4} />
+        </label>
+        <button className="soft-action form-next" type="submit">Маршрут</button>
       </form>
     </section>
   );
 }
 
-function ProfileView({ user, form, setField, toggleField, onSubmit, notifications }) {
+function RouteScreen({ points, addPoint, onPublish }) {
   return (
-    <div className="profile-layout">
-      <section className="client-panel">
-        <div className="profile-head">
-          <div className="profile-avatar">{initials(user)}</div>
-          <div>
-            <h2>{user.name}</h2>
-            <p>{user.phoneVerified ? "Телефон подтвержден" : "Телефон не подтвержден"}</p>
-          </div>
+    <section className="content-pad create-screen">
+      <div className="route-editor">
+        <div className="map-editor" role="button" tabIndex={0} onClick={addPoint} onKeyDown={event => event.key === "Enter" && addPoint()}>
+          <svg viewBox="0 0 100 100" aria-hidden="true">
+            <polyline points={points.map(point => `${point.x},${point.y}`).join(" ")} />
+            {points.map(point => <circle key={`${point.x}-${point.y}`} cx={point.x} cy={point.y} r="3" />)}
+          </svg>
         </div>
-
-        <form className="client-form" onSubmit={onSubmit}>
-          <div className="form-grid two">
-            <label>
-              <span>Фамилия</span>
-              <input value={form.lastName} onChange={setField("lastName")} required />
-            </label>
-            <label>
-              <span>Имя</span>
-              <input value={form.firstName} onChange={setField("firstName")} required />
-            </label>
-          </div>
-          <div className="form-grid two">
-            <label>
-              <span>Пол</span>
-              <select value={form.gender} onChange={setField("gender")}>
-                <option value="male">Мужской</option>
-                <option value="female">Женский</option>
-                <option value="other">Другой</option>
-              </select>
-            </label>
-            <label>
-              <span>Телефон</span>
-              <input value={form.phone} onChange={setField("phone")} placeholder="Необязательно" />
-            </label>
-          </div>
-
-          <div className="privacy-box">
-            <label>
-              <input type="checkbox" checked={form.hideEmail} onChange={toggleField("hideEmail")} />
-              Скрывать почту в профиле
-            </label>
-            <label>
-              <input type="checkbox" checked={form.hidePhone} onChange={toggleField("hidePhone")} />
-              Скрывать телефон в профиле
-            </label>
-          </div>
-
-          <button className="primary-action" type="submit">Сохранить профиль</button>
-        </form>
-      </section>
-
-      <section className="client-panel">
-        <div className="panel-head">
-          <div>
-            <p>Профиль</p>
-            <h2>Статистика</h2>
-          </div>
-        </div>
-        <div className="profile-stats">
-          <div><strong>{user.stats?.organizedWorkouts || 0}</strong><span>Проведено</span></div>
-          <div><strong>{user.stats?.attendedWorkouts || 0}</strong><span>Посещено</span></div>
-          <div><strong>{user.stats?.distance || 0}</strong><span>Км всего</span></div>
-          <div><strong>{user.stats?.rating || "0.0"}</strong><span>Рейтинг</span></div>
-        </div>
-      </section>
-
-      <section className="client-panel">
-        <div className="panel-head">
-          <div>
-            <p>Последнее</p>
-            <h2>Уведомления</h2>
-          </div>
-        </div>
-        <div className="notification-list">
-          {notifications.slice(0, 6).map(item => (
-            <article key={item.id}>
-              <strong>{item.title}</strong>
-              <span>{item.message}</span>
-            </article>
-          ))}
-          {!notifications.length && <EmptyBlock text="Новых уведомлений нет." />}
-        </div>
-      </section>
-    </div>
+        <label className="wide">
+          <span>Комментарий</span>
+          <textarea rows={4} />
+        </label>
+        <button className="soft-action form-next" type="button" onClick={onPublish}>Опубликовать</button>
+      </div>
+    </section>
   );
 }
 
-function WorkoutCard({ workout, onOpen, onJoin, highlight = false }) {
+function OrganizerScreen({ workout, created, onRequests, onChat }) {
   return (
-    <article className={highlight ? "workout-card highlight" : "workout-card"}>
-      <button className="workout-card-main" type="button" onClick={() => onOpen(workout)}>
-        <div className="workout-card-top">
-          <div>
-            <h3>{workout.title}</h3>
-            <p>{workout.meetingPoint?.name || "Место сбора"} · {workout.route?.name || "Маршрут"}</p>
-          </div>
-          <span className={`status-pill ${workout.status}`}>{statusLabel(workout.status)}</span>
+    <section className="detail-screen">
+      <div className="organizer-ribbon">Вы организатор</div>
+      <RouteMap variant="loop" />
+      <div className="detail-body">
+        {created && <div className="success-note">Тренировка опубликована</div>}
+        <div className="detail-title">
+          <h1>{workout.title}</h1>
+          <strong>{workout.places}</strong>
         </div>
-
-        <div className="workout-meta">
-          <span>{formatDate(workout.startAt)}</span>
-          <span>{workout.distanceKm} км</span>
-          <span>{workout.paceMinPerKm} мин/км</span>
-          <span>{difficultyLabel(workout.difficulty)}</span>
-        </div>
-
-        <div className="workout-progress" aria-label={`Свободно ${workout.freePlaces} мест`}>
-          <span className={`progress-fill p-${capacityStep(workout)}`} />
-        </div>
-      </button>
-
-      <div className="workout-card-footer">
-        <div>
-          <strong>{workout.organizerName}</strong>
-          <span>{workout.confirmedCount}/{workout.participantLimit} мест занято</span>
-        </div>
-        {onJoin && (
-          <button type="button" onClick={() => onJoin(workout)} disabled={!["planned", "open"].includes(workout.status)}>
-            Заявка
+        <InfoGrid workout={workout} />
+        <Participants />
+        <Organizer workout={workout} />
+        <div className="action-grid organizer-actions">
+          <button className="soft-action" type="button" onClick={onChat}>
+            <Icon name="chat" />
+            Чат
           </button>
-        )}
-      </div>
-    </article>
-  );
-}
-
-function WorkoutDetail({ workout, onBack, onJoin }) {
-  return (
-    <section className="workout-detail">
-      <button className="back-button" type="button" onClick={onBack}>Назад к списку</button>
-
-      <div className="detail-map" aria-hidden="true">
-        <svg viewBox="0 0 520 280" role="img">
-          <path className="map-land" d="M36 205C65 92 120 22 165 38c42 15 55 82 89 101 29 16 71 5 98-18 35-29 83 34 91 83 7 45-55 15-101 24-67 14-122-59-184-32-40 17-68 72-122 9z" />
-          <path className="map-route" d="M54 213c55-17 69-91 119-104 66-17 91 75 157 66 45-6 69-39 102-10" />
-          <circle cx="54" cy="213" r="8" />
-          <circle cx="432" cy="165" r="8" />
-        </svg>
-      </div>
-
-      <div className="detail-content">
-        <div className="detail-head">
-          <div>
-            <p>{workout.meetingPoint?.name || "Точка сбора"}</p>
-            <h2>{workout.title}</h2>
-          </div>
-          <strong>{workout.confirmedCount}/{workout.participantLimit} мест</strong>
-        </div>
-
-        <div className="detail-grid">
-          <Info label="Дата" value={formatDate(workout.startAt)} />
-          <Info label="Дистанция" value={`${workout.distanceKm} км`} />
-          <Info label="Темп" value={`${workout.paceMinPerKm} мин/км`} />
-          <Info label="Уровень" value={difficultyLabel(workout.difficulty)} />
-        </div>
-
-        <div className="detail-section">
-          <h3>Организатор</h3>
-          <div className="organizer-row">
-            <div className="mini-avatar">{workout.organizerName?.[0] || "R"}</div>
-            <div>
-              <strong>{workout.organizerName}</strong>
-              <span>Рейтинг будет рассчитан после отзывов</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="detail-section">
-          <h3>Участники</h3>
-          <div className="participant-strip">
-            {Array.from({ length: Math.min(5, Math.max(1, workout.confirmedCount || 1)) }).map((_, index) => (
-              <span key={index}>{index + 1}</span>
-            ))}
-          </div>
-        </div>
-
-        <div className="detail-actions">
-          <button type="button">Открыть чат</button>
-          <button type="button" onClick={() => onJoin(workout)} disabled={!["planned", "open"].includes(workout.status)}>
-            Отправить заявку
+          <button className="soft-action" type="button" onClick={onRequests}>
+            <Icon name="users" />
+            Заявки
           </button>
+          <button className="soft-action" type="button">
+            <Icon name="edit" />
+            Изменить
+          </button>
+          <button className="danger-action" type="button">Отменить</button>
         </div>
       </div>
     </section>
   );
 }
 
+function RequestsScreen({ requests, onBack, onUpdate }) {
+  return (
+    <section className="content-pad requests-screen">
+      <button className="plain-back" type="button" onClick={onBack}>
+        <Icon name="arrow" />
+        Назад
+      </button>
+      <h1>Заявки</h1>
+      {requests.map(item => (
+        <article className="request-card" key={item.id}>
+          <div className="mini-avatar">{item.name[0]}</div>
+          <div>
+            <strong>{item.name}</strong>
+            <span>{item.meta}</span>
+            <em className={`request-status ${item.status}`}>{requestLabel(item.status)}</em>
+          </div>
+          {item.status === "pending" && (
+            <div className="request-actions">
+              <button type="button" onClick={() => onUpdate(item.id, "confirmed")}>Да</button>
+              <button type="button" onClick={() => onUpdate(item.id, "declined")}>Нет</button>
+            </div>
+          )}
+        </article>
+      ))}
+    </section>
+  );
+}
+
+function ChatScreen({ workout, onBack }) {
+  const [messages, setMessages] = useState([
+    { id: 1, author: "user1", text: "На месте. Не вижу вас", mine: false },
+    { id: 2, author: "user2", text: "Подождите меня, пожалуйста! 1 мин", mine: false },
+    { id: 3, author: "Вы", text: "Мы у скамейки, ждем всех и начинаем", mine: true },
+  ]);
+  const [text, setText] = useState("");
+
+  const send = () => {
+    if (!text.trim()) return;
+    setMessages(prev => [...prev, { id: Date.now(), author: "Вы", text: text.trim(), mine: true }]);
+    setText("");
+  };
+
+  return (
+    <section className="chat-screen">
+      <header className="chat-head">
+        <button className="icon-btn" type="button" onClick={onBack} aria-label="Назад">
+          <Icon name="arrow" />
+        </button>
+        <div>
+          <h1>{workout.title}</h1>
+          <span>Кол-во участников - дата время</span>
+        </div>
+      </header>
+      <div className="message-list">
+        {messages.map(message => (
+          <article className={message.mine ? "message mine" : "message"} key={message.id}>
+            {!message.mine && <span>{message.author}</span>}
+            <p>{message.text}</p>
+          </article>
+        ))}
+      </div>
+      <form className="chat-form" onSubmit={(event) => {
+        event.preventDefault();
+        send();
+      }}>
+        <input value={text} onChange={event => setText(event.target.value)} />
+        <button type="submit" aria-label="Отправить">
+          <Icon name="send" />
+        </button>
+      </form>
+    </section>
+  );
+}
+
+function ProfileScreen({ user, onLogout }) {
+  return (
+    <section className="content-pad profile-screen">
+      <div className="profile-avatar">{user.initials || "A"}</div>
+      <StatsRow />
+      <ProfileLink label="Достижения" value="3 значка" />
+      <ProfileLink label="История тренировок" value="10 записей" />
+      <ProfileLink label="Настройки" value="Приватность" />
+      <ProfileLink label="Отзывы и рейтинг" value="10.0" />
+      <ProfileLink label="Оставить жалобу" value="" />
+      <button className="danger-action logout-action" type="button" onClick={onLogout}>Выйти</button>
+    </section>
+  );
+}
+
+function WorkoutCard({ workout, onOpen, compact = false }) {
+  return (
+    <article className={compact ? "workout-card compact" : "workout-card"} onClick={onOpen}>
+      <div className="card-main">
+        <h2>{workout.subtitle}</h2>
+        <div className="card-meta">
+          <span><Icon name="clock" /> {workout.date}</span>
+          <span><Icon name="route" /> {workout.distance}</span>
+          <span><Icon name="bolt" /> {workout.pace}</span>
+        </div>
+      </div>
+      <div className="card-footer">
+        <div className="mini-avatar">{workout.organizerInitial}</div>
+        <span>{workout.organizer}</span>
+        <strong><Icon name="star" /> {workout.rating}</strong>
+      </div>
+    </article>
+  );
+}
+
+function BottomNav({ active, onChange }) {
+  const items = [
+    ["home", "home", "Главная"],
+    ["workouts", "runner", "Бег"],
+    ["create", "plus", "Создать"],
+    ["profile", "users", "Профиль"],
+  ];
+
+  return (
+    <nav className="bottom-nav" aria-label="Основная навигация">
+      {items.map(([id, icon, label]) => (
+        <button className={active === id ? "active" : ""} type="button" key={id} onClick={() => onChange(id)} aria-label={label}>
+          <Icon name={icon} />
+        </button>
+      ))}
+    </nav>
+  );
+}
+
+function StatsRow() {
+  return (
+    <div className="stats-row">
+      <Stat value="10" label="Тренировок" />
+      <Stat value="100" label="Км всего" />
+      <Stat value="10.0" label="Рейтинг" />
+    </div>
+  );
+}
+
+function Stat({ value, label }) {
+  return (
+    <div className="stat-card">
+      <strong>{value}</strong>
+      <span>{label}</span>
+    </div>
+  );
+}
+
+function InfoGrid({ workout }) {
+  return (
+    <div className="info-grid">
+      <Info label="Дата" value={workout.date} />
+      <Info label="Дистанция" value={workout.distance} />
+      <Info label="Темп" value={workout.pace} />
+      <Info label="Уровень" value={workout.level} />
+    </div>
+  );
+}
+
 function Info({ label, value }) {
   return (
-    <div className="info-item">
+    <div>
       <span>{label}</span>
       <strong>{value}</strong>
     </div>
   );
 }
 
-function EmptyBlock({ text }) {
-  return <div className="empty-block">{text}</div>;
+function Participants() {
+  return (
+    <section className="mini-section">
+      <h2>Участники</h2>
+      <div className="participant-stack">
+        <span />
+        <span />
+        <span />
+      </div>
+    </section>
+  );
 }
 
-function pageTitle(activeTab, selectedWorkout) {
-  if (selectedWorkout) return "Информация о тренировке";
+function Organizer({ workout, small = false }) {
+  return (
+    <section className={small ? "organizer small" : "organizer"}>
+      <h2>Организатор</h2>
+      <div>
+        <div className="large-avatar">{workout.organizerInitial}</div>
+        <p>
+          <strong>{workout.organizer}</strong>
+          <span><Icon name="star" /> {workout.rating} 10 тренировок</span>
+        </p>
+      </div>
+    </section>
+  );
+}
+
+function Metric({ value, label }) {
+  return (
+    <div className="metric">
+      <strong>{value}</strong>
+      <span>{label}</span>
+    </div>
+  );
+}
+
+function RatingLine({ label, value, onChange }) {
+  return (
+    <div className="rating-line">
+      <span>{label}</span>
+      <div>
+        {[1, 2, 3, 4, 5].map(star => (
+          <button className={value >= star ? "active" : ""} type="button" key={star} onClick={() => onChange(star)}>
+            <Icon name="star" />
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ProfileLink({ label, value }) {
+  return (
+    <button className="profile-link" type="button">
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </button>
+  );
+}
+
+function RouteMap({ variant }) {
+  return (
+    <div className={`route-map ${variant}`}>
+      <svg viewBox="0 0 320 220" aria-hidden="true">
+        {variant === "track" ? (
+          <>
+            <path className="map-path" d="M34 128 C80 180 114 112 157 95 C206 77 210 150 256 134 C284 125 292 101 320 94" />
+            <path className="map-flag" d="M56 130 L48 82 L78 98 L54 104" />
+          </>
+        ) : (
+          <>
+            <path className="map-outline" d="M38 174 C50 90 95 18 118 30 C139 42 145 62 155 80 C171 109 196 95 217 90 C243 82 272 115 278 149 C284 183 233 166 201 166 C155 166 120 128 92 130 C66 132 67 173 38 174 Z" />
+            <path className="map-path" d="M36 170 C75 152 82 103 124 94 C164 85 172 129 218 132 C247 134 255 128 276 130" />
+            <path className="map-flag" d="M50 160 L44 124 L68 137 L48 140" />
+          </>
+        )}
+      </svg>
+    </div>
+  );
+}
+
+function requestLabel(status) {
   return {
-    home: "Главная",
-    workouts: "Тренировки",
-    create: "Новая тренировка",
-    profile: "Профиль",
-  }[activeTab] || "RunTogether";
+    pending: "Ожидает",
+    confirmed: "Подтвержден",
+    declined: "Отклонен",
+  }[status] || status;
 }
 
-function initials(user) {
-  return `${user.firstName?.[0] || ""}${user.lastName?.[0] || ""}`.trim() || user.initials || "RT";
-}
+function Icon({ name }) {
+  const common = {
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: "2",
+    strokeLinecap: "round",
+    strokeLinejoin: "round",
+    "aria-hidden": "true",
+  };
 
-function formatDate(value) {
-  return new Date(value).toLocaleString("ru-RU", {
-    day: "2-digit",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
+  const icons = {
+    arrow: <path d="M15 18l-6-6 6-6M9 12h12" />,
+    home: <><path d="M3 11l9-8 9 8" /><path d="M5 10v10h5v-6h4v6h5V10" /></>,
+    runner: <><circle cx="13" cy="4" r="2" /><path d="M9 21l3-7-4-2-2 4" /><path d="M14 8l-2 6 5 2" /><path d="M10 8l4 2 3-2" /></>,
+    plus: <><circle cx="12" cy="12" r="10" /><path d="M12 8v8M8 12h8" /></>,
+    users: <><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></>,
+    chat: <><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z" /><path d="M8 9h8M8 13h5" /></>,
+    edit: <><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" /></>,
+    search: <><circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3" /></>,
+    filter: <><path d="M3 5h18M6 12h12M10 19h4" /></>,
+    clock: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>,
+    route: <><path d="M4 17c5-8 8 4 16-6" /><circle cx="4" cy="17" r="2" /><circle cx="20" cy="11" r="2" /></>,
+    bolt: <path d="M13 2L4 14h7l-1 8 10-13h-7z" />,
+    star: <path d="M12 3l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.2 6.4 20.2 7.5 14 3 9.6l6.2-.9z" />,
+    pause: <><path d="M9 5v14" /><path d="M15 5v14" /></>,
+    play: <path d="M8 5v14l11-7z" />,
+    send: <><path d="M22 2L11 13" /><path d="M22 2l-7 20-4-9-9-4z" /></>,
+  };
 
-function difficultyLabel(value) {
-  return { easy: "Легкая", medium: "Средняя", hard: "Сложная" }[value] || value;
-}
-
-function statusLabel(value) {
-  return {
-    planned: "Планируется",
-    open: "Набор открыт",
-    full: "Набор закрыт",
-    in_progress: "В процессе",
-    completed: "Завершена",
-    cancelled: "Отменена",
-  }[value] || value;
-}
-
-function capacityStep(workout) {
-  if (!workout.participantLimit) return 0;
-  const percent = Math.min(100, Math.round((workout.confirmedCount / workout.participantLimit) * 100));
-  return Math.round(percent / 10) * 10;
+  return <svg className="rt-icon" {...common}>{icons[name]}</svg>;
 }
