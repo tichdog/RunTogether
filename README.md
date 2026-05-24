@@ -16,14 +16,13 @@
 
 ## Быстрый запуск
 
-### 1. Запустить PostgreSQL
+### 1. Запустить PostgreSQL (через docker контейнер)
 
-Открой Docker Desktop и дождись, пока он полностью запустится.
+Открыть Docker Desktop и дождаться, пока он полностью запустится.
 
-Затем:
+Затем: зайти в папку sport-backend и выполнить
 
 ```powershell
-cd C:\Users\CrazyRabbit\Documents\Web\sport-backend
 docker compose up -d
 ```
 
@@ -39,10 +38,16 @@ User: postgres
 Password: postgres
 ```
 
+### 1.2 Если запуск через PgAdmin
+
+Создать в PgAdmin новую базу данных, и выполнить 2 SQL файла которые лежат в папке бэка.
+Там находятся запросы для создания таблиц и дефолтных значений.  
+В .env файле укажите имя БД и пароль, а так же порт на котором запущена Бд (обычно 5432)
+
 ### 2. Настроить backend
 
 ```powershell
-cd C:\Users\CrazyRabbit\Documents\Web\sport-backend
+cd ...\Web\sport-backend
 Copy-Item .env.example .env
 npm install
 npm run dev
@@ -54,16 +59,10 @@ Backend запустится на:
 http://localhost:4000
 ```
 
-Проверка:
-
-```powershell
-Invoke-WebRequest http://localhost:4000/health
-```
-
 ### 3. Запустить frontend
 
 ```powershell
-cd C:\Users\CrazyRabbit\Documents\Web\sport-frontend
+cd ...\Web\sport-frontend
 npm install
 npm run dev
 ```
@@ -82,6 +81,7 @@ http://localhost:5174
 
 ## Тестовый вход
 
+(Если БД была запущена в контейнере)
 После первого запуска Docker-БД автоматически применяются `schema.sql` и `seed.sql`.
 
 Администратор:
@@ -103,65 +103,14 @@ Password: Admin12345!
 
 Администратор попадает в админ-панель. Обычные пользователи попадают в клиентский интерфейс.
 
-## PgAdmin
-
-Чтобы смотреть таблицы через PgAdmin:
-
-1. Открой PgAdmin.
-2. Нажми `Register -> Server`.
-3. Во вкладке `General` укажи имя, например `RunTogether`.
-4. Во вкладке `Connection` укажи:
-
-```text
-Host name/address: localhost
-Port: 5433
-Maintenance database: sport_training
-Username: postgres
-Password: postgres
-```
-
-После подключения таблицы лежат в:
-
-```text
-Servers -> RunTogether -> Databases -> sport_training -> Schemas -> public -> Tables
-```
 
 ## Если БД нужно пересоздать
 
 Команда удалит текущие данные и заново применит схему и seed:
 
 ```powershell
-cd C:\Users\CrazyRabbit\Documents\Web\sport-backend
+cd ...\Web\sport-backend
 docker compose down -v
 docker compose up -d
 ```
 
-## Полезные команды
-
-Backend:
-
-```powershell
-cd C:\Users\CrazyRabbit\Documents\Web\sport-backend
-npm run dev
-npm run check
-```
-
-Frontend:
-
-```powershell
-cd C:\Users\CrazyRabbit\Documents\Web\sport-frontend
-npm run dev
-npm run build
-```
-
-## Что не загружать в Git
-
-В репозитории не нужны:
-
-- `node_modules`
-- `.env`
-- `dist`
-- логи
-- загруженные файлы из `uploads`
-
-Это уже учтено в `.gitignore`.
