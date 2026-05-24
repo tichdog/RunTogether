@@ -1,5 +1,5 @@
 import { ROLE_LABELS, T } from "../../tokens";
-import { Btn } from "../ui";
+import { Avatar, Btn } from "../ui";
 
 const NAV_ITEMS = [
   { id: "Обзор", icon: "□" },
@@ -56,9 +56,14 @@ export function Sidebar({ active, setActive, user, onLogout }) {
       </nav>
 
       <div style={{ padding: "14px 16px", borderTop: "1px solid #2D2C28" }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: T.sidebarText }}>{user?.name}</div>
-        <div style={{ fontSize: 11, color: T.sidebarMuted, marginBottom: 10 }}>
-          {ROLE_LABELS[user?.role] || "Участник"}
+        <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 10 }}>
+          <Avatar initials={user?.initials} src={user?.avatarUrl} size={30} />
+          <div style={{ minWidth: 0 }}>
+            <div style={{ overflow: "hidden", fontSize: 12, fontWeight: 700, color: T.sidebarText, textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{user?.name}</div>
+            <div style={{ fontSize: 11, color: T.sidebarMuted, marginTop: 1 }}>
+              {ROLE_LABELS[user?.role] || "Участник"}
+            </div>
+          </div>
         </div>
         <Btn onClick={onLogout} variant="ghost" style={{ width: "100%", color: T.sidebarText, borderColor: "#3B3A36" }}>
           Выйти

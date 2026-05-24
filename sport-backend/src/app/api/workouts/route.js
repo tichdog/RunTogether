@@ -7,7 +7,7 @@ import { parseWorkoutBody } from "@/lib/repositories/workouts";
 import { syncWorkoutStatus, workoutPayload } from "@/lib/services/workouts";
 
 export const GET = route(async request => {
-  await requireAuth(request);
+  const user = await requireAuth(request);
   const { searchParams } = new URL(request.url);
   const lat = searchParams.get("lat") == null ? null : Number(searchParams.get("lat"));
   const lng = searchParams.get("lng") == null ? null : Number(searchParams.get("lng"));
@@ -36,14 +36,42 @@ export const GET = route(async request => {
   if (hasGeo) {
     params.push(lat, lng);
   }
+  const currentUserParam = params.length + 1;
+  params.push(user.id);
 
   const { rows } = await query(
     `select w.*, u.full_name as organizer_name,
+            jsonb_build_object(
+              'id', u.id,
+              'name', u.full_name,
+              'initials', upper(left(coalesce(u.first_name, u.full_name, u.email, 'U'), 1) || left(coalesce(u.last_name, ''), 1)),
+              'avatarUrl', u.avatar_url,
+              'role', u.role,
+              'stats', jsonb_build_object('rating', os.average_rating)
+            ) as organizer,
+            coalesce((
+              select jsonb_agg(jsonb_build_object(
+                'id', pu.id,
+                'name', pu.full_name,
+                'initials', upper(left(coalesce(pu.first_name, pu.full_name, pu.email, 'U'), 1) || left(coalesce(pu.last_name, ''), 1)),
+                'avatarUrl', pu.avatar_url,
+                'role', pu.role,
+                'stats', jsonb_build_object('rating', ps.average_rating)
+              ) order by pu.full_name)
+                from workout_participants pwp
+                join users pu on pu.id = pwp.user_id
+                left join user_training_stats ps on ps.user_id = pu.id
+               where pwp.workout_id = w.id and pwp.status = 'confirmed'
+            ), '[]'::jsonb) as participants,
             count(wp.id) filter (where wp.status = 'confirmed') as confirmed_count,
+            my_wp.status as participant_status,
+            my_wp.id as participant_request_id,
             ${distanceExpr} as distance_from_user_km
        from workouts w
        join users u on u.id = w.organizer_id
+       left join user_training_stats os on os.user_id = u.id
        left join workout_participants wp on wp.workout_id = w.id
+       left join workout_participants my_wp on my_wp.workout_id = w.id and my_wp.user_id = $${currentUserParam}
       where ($1::timestamptz is null or w.start_at >= $1)
         and ($2::timestamptz is null or w.start_at <= $2)
         and ($3::numeric is null or w.distance_km >= $3)
@@ -51,14 +79,19 @@ export const GET = route(async request => {
         and ($5::numeric is null or w.pace_min_per_km <= $5)
         and ($6::text is null or w.difficulty = $6)
         and ($7::numeric is null or ${distanceExpr} <= $7)
-      group by w.id, u.full_name
-      order by ${sort === "distance" ? "distance_from_user_km nulls last, w.start_at" : "w.start_at"}
+      group by w.id, u.id, os.average_rating, my_wp.status, my_wp.id
+      order by ${sort === "distance"
+        ? "distance_from_user_km nulls last, w.start_at"
+        : "case when w.status in ('completed', 'cancelled') or now() >= w.start_at + (w.duration_minutes || ' minutes')::interval then 1 else 0 end, w.start_at"}
       limit 100`,
     params,
   );
 
-  await Promise.all(rows.map(row => syncWorkoutStatus(query, row.id)));
-  return json({ workouts: rows.map(workoutPayload) });
+  const syncedRows = await Promise.all(rows.map(async row => {
+    const synced = await syncWorkoutStatus(query, row.id);
+    return synced ? { ...row, status: synced.status, updated_at: synced.updated_at } : row;
+  }));
+  return json({ workouts: syncedRows.map(workoutPayload) });
 });
 
 export const POST = route(async request => {
@@ -75,7 +108,7 @@ export const POST = route(async request => {
       meeting_point_address, meeting_lat, meeting_lng, route_name, route_geojson,
       distance_km, pace_min_per_km, difficulty, participant_limit, status
     )
-    values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,$12,$13,$14,$15,'planned')
+    values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,$12,$13,$14,$15,'open')
     returning *`,
     [
       user.id,

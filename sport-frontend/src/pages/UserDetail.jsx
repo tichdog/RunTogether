@@ -8,6 +8,7 @@ export function UserDetail({ user, currentAdmin, onBack, onChanged, onDeleted })
   const [role, setRole] = useState(user.role);
   const [history, setHistory] = useState([]);
   const [achievements, setAchievements] = useState([]);
+  const [avatarSaving, setAvatarSaving] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -25,6 +26,24 @@ export function UserDetail({ user, currentAdmin, onBack, onChanged, onDeleted })
       onChanged?.(data.user);
     } catch (err) {
       setError(err.message);
+    }
+  };
+
+  const saveAvatar = async (event) => {
+    const [file] = event.target.files || [];
+    event.target.value = "";
+    if (!file) return;
+
+    setError("");
+    setAvatarSaving(true);
+    try {
+      const data = await api.updateUserAvatar(current.id, file);
+      setCurrent(data.user);
+      onChanged?.(data.user);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setAvatarSaving(false);
     }
   };
 
@@ -55,12 +74,13 @@ export function UserDetail({ user, currentAdmin, onBack, onChanged, onDeleted })
   const canDelete = !isSelf && (!targetIsAdmin || canManageTargetAdmin);
   const canBlock = canDelete;
   const canChangeRole = !isSelf && (!targetIsAdmin || canManageTargetAdmin);
+  const canChangeAvatar = isSelf || !targetIsAdmin || canManageTargetAdmin;
 
   const statCards = [
     ["Проведено", current.stats?.organizedWorkouts || 0, T.accent],
     ["Посещено", current.stats?.attendedWorkouts || 0, T.success],
     ["Дистанция", `${current.stats?.distance || 0} км`, T.warning],
-    ["Рейтинг", current.stats?.rating || "нет", T.text],
+    ["Рейтинг", current.stats?.rating ? `★ ${Number(current.stats.rating).toFixed(1)}` : "нет", T.text],
   ];
 
   return (
@@ -71,6 +91,12 @@ export function UserDetail({ user, currentAdmin, onBack, onChanged, onDeleted })
           Пользователи / <strong style={{ color: T.text }}>{current.name}</strong>
         </div>
       </div>
+
+      {error && (
+        <div style={{ marginBottom: 16, color: T.danger, fontSize: 13, fontWeight: 700 }}>
+          {error}
+        </div>
+      )}
 
       <div className="user-detail-grid" style={{ display: "grid", gridTemplateColumns: "1fr 300px", gap: 18 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
@@ -83,6 +109,22 @@ export function UserDetail({ user, currentAdmin, onBack, onChanged, onDeleted })
                   <Badge text={ROLE_LABELS[current.role]} colors={ROLE_COLORS[current.role]} />
                   <StatusBadge status={current.status} />
                 </div>
+                <label style={{
+                  display: "inline-flex", alignItems: "center", marginTop: 10,
+                  padding: "7px 11px", border: `1px solid ${T.border}`,
+                  borderRadius: T.radiusSm, color: canChangeAvatar ? T.text : T.textHint,
+                  fontSize: 12, fontWeight: 700, cursor: canChangeAvatar ? "pointer" : "default",
+                  opacity: canChangeAvatar ? 1 : 0.55,
+                }}>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={saveAvatar}
+                    disabled={!canChangeAvatar || avatarSaving}
+                    style={{ position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0 0 0 0)" }}
+                  />
+                  {avatarSaving ? "Загрузка..." : "Загрузить аватарку"}
+                </label>
               </div>
             </div>
 

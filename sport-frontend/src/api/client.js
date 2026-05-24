@@ -1,12 +1,15 @@
 const API_BASE = import.meta.env.VITE_API_URL || "";
 
 async function request(path, options = {}) {
+  const isFormData = options.body instanceof FormData;
   const response = await fetch(`${API_BASE}${path}`, {
     credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      ...(options.headers || {}),
-    },
+    headers: isFormData
+      ? { ...(options.headers || {}) }
+      : {
+          "Content-Type": "application/json",
+          ...(options.headers || {}),
+        },
     ...options,
   });
 
@@ -24,6 +27,7 @@ export const api = {
     method: "POST",
     body: JSON.stringify(payload),
   }),
+  checkEmail: (email, options = {}) => request(`/api/auth/email?email=${encodeURIComponent(email)}`, options),
   login: payload => request("/api/auth/login", {
     method: "POST",
     body: JSON.stringify(payload),
@@ -37,6 +41,8 @@ export const api = {
     method: "PATCH",
     body: JSON.stringify(payload),
   }),
+  updateMyAvatar: file => uploadAvatar("/api/users/me/avatar", file),
+  updateUserAvatar: (id, file) => uploadAvatar(`/api/users/${id}/avatar`, file),
   updateRole: (id, role) => request(`/api/users/${id}/role`, {
     method: "PATCH",
     body: JSON.stringify({ role }),
@@ -47,8 +53,13 @@ export const api = {
   achievements: id => request(`/api/users/${id}/achievements`),
 
   workouts: params => request(`/api/workouts${toQuery(params)}`),
+  workout: id => request(`/api/workouts/${id}`),
   createWorkout: payload => request("/api/workouts", {
     method: "POST",
+    body: JSON.stringify(payload),
+  }),
+  updateWorkout: (id, payload) => request(`/api/workouts/${id}`, {
+    method: "PATCH",
     body: JSON.stringify(payload),
   }),
   cancelWorkout: (id, reason) => request(`/api/workouts/${id}/cancel`, {
@@ -56,7 +67,17 @@ export const api = {
     body: JSON.stringify({ reason }),
   }),
   joinWorkout: id => request(`/api/workouts/${id}/requests`, { method: "POST" }),
+  workoutRequests: id => request(`/api/workouts/${id}/requests`),
+  reviewTargets: id => request(`/api/workouts/${id}/reviews`),
+  respondRequest: (workoutId, requestId, status) => request(`/api/workouts/${workoutId}/requests/${requestId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ status }),
+  }),
   cancelParticipation: id => request(`/api/workouts/${id}/participation`, { method: "DELETE" }),
+  createReview: (workoutId, payload) => request(`/api/workouts/${workoutId}/reviews`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  }),
 
   notifications: () => request("/api/notifications"),
   reports: () => request("/api/reports"),
@@ -77,4 +98,13 @@ function toQuery(params = {}) {
   });
   const text = search.toString();
   return text ? `?${text}` : "";
+}
+
+function uploadAvatar(path, file) {
+  const form = new FormData();
+  form.append("avatar", file);
+  return request(path, {
+    method: "POST",
+    body: form,
+  });
 }

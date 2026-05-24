@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "../api/client";
 import { Btn, Card, EmptyState, Input, Select, StatusBadge } from "../components/ui";
 import { T } from "../tokens";
@@ -24,15 +24,15 @@ export function Workouts() {
   const [form, setForm] = useState(INITIAL_FORM);
   const [message, setMessage] = useState("");
 
-  const load = () => {
+  const load = useCallback(() => {
     api.workouts({ difficulty, sort })
       .then(data => setWorkouts(data.workouts))
       .catch(err => setMessage(err.message));
-  };
+  }, [difficulty, sort]);
 
   useEffect(() => {
     load();
-  }, [difficulty, sort]);
+  }, [load]);
 
   const filtered = useMemo(() => workouts.filter(workout =>
     workout.title.toLowerCase().includes(search.toLowerCase()) ||

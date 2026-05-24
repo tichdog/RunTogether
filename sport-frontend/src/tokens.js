@@ -42,7 +42,7 @@ export const STATUS_LABELS = {
   unverified: "Не подтвержден",
   phone_verified: "Телефон подтвержден",
   fully_verified: "Подтвержден",
-  planned: "Планируется",
+  planned: "Набор открыт",
   open: "Набор открыт",
   full: "Набор завершен",
   in_progress: "В процессе",
@@ -53,7 +53,7 @@ export const STATUS_LABELS = {
 export const STATUS_STYLES = {
   active: { bg: "#F0FDF4", text: "#15803D", dot: "#16A34A" },
   blocked: { bg: "#FEF2F2", text: "#DC2626", dot: "#DC2626" },
-  planned: { bg: "#FFFBEB", text: "#D97706", dot: "#D97706" },
+  planned: { bg: "#EFF6FF", text: "#1D4ED8", dot: "#2563EB" },
   open: { bg: "#EFF6FF", text: "#1D4ED8", dot: "#2563EB" },
   full: { bg: "#FFF7ED", text: "#C2410C", dot: "#EA580C" },
   in_progress: { bg: "#F0FDF4", text: "#15803D", dot: "#16A34A" },
