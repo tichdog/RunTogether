@@ -65,7 +65,7 @@ export function Overview({ setActive, setSelectedUser }) {
               <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
                 <Avatar initials={user.initials} src={user.avatarUrl} size={30} />
                 <button
-                  onClick={() => { setSelectedUser(user); setActive("Пользователи"); }}
+                  onClick={() => { setActive("Пользователи"); setSelectedUser(user); }}
                   style={{ background: "none", border: "none", cursor: "pointer", fontSize: 13, fontWeight: 700, color: T.text, padding: 0 }}
                 >
                   {user.name}

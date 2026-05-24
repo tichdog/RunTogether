@@ -52,13 +52,18 @@
 
 .rt-brand span,
 .rt-avatar {
-  display: grid;
-  place-items: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   flex: 0 0 auto;
+  overflow: hidden;
   border-radius: 50%;
   background: var(--rt-accent);
   color: #1d331d;
   font-weight: 800;
+  line-height: 1;
+  text-align: center;
+  white-space: nowrap;
 }
 
 .rt-brand span {
@@ -107,7 +112,7 @@
 
 .rt-nav.compact {
   height: 66px;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(6, 1fr);
   gap: 0;
 }
 
@@ -135,19 +140,19 @@
   flex: 1;
 }
 
-.rt-sidebar-user strong,
-.rt-sidebar-user span {
+.rt-sidebar-user div strong,
+.rt-sidebar-user div span {
   display: block;
 }
 
-.rt-sidebar-user strong {
+.rt-sidebar-user div strong {
   overflow: hidden;
   font-size: 13px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.rt-sidebar-user span {
+.rt-sidebar-user div span {
   margin-top: 2px;
   color: var(--rt-muted);
   font-size: 12px;
@@ -159,6 +164,12 @@
   display: grid;
   place-items: center;
   border-radius: 8px;
+  color: var(--rt-muted);
+}
+
+.rt-sidebar-user button:hover {
+  background: var(--rt-surface-soft);
+  color: var(--rt-text);
 }
 
 .rt-main {
@@ -195,6 +206,14 @@
 .rt-page {
   width: min(100% - 40px, 1180px);
   margin: 28px auto 0;
+}
+
+.rt-page-head {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
 }
 
 .rt-hero {
@@ -398,13 +417,13 @@
   white-space: nowrap;
 }
 
-.rt-status.pending,
-.rt-status.planned {
+.rt-status.pending {
   background: #fff4ce;
   color: var(--rt-warning);
 }
 
 .rt-status.confirmed,
+.rt-status.planned,
 .rt-status.open {
   background: #e5f7dc;
   color: #246a35;
@@ -491,6 +510,24 @@
   font-weight: 800;
 }
 
+.rt-header-person {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--rt-accent);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.rt-header-person:hover {
+  text-decoration: underline;
+}
+
 .rt-workout-header h1 {
   margin: 8px 0;
   font-size: clamp(28px, 4vw, 46px);
@@ -533,10 +570,27 @@
 
 .rt-form label {
   display: grid;
+  align-content: start;
   gap: 7px;
   color: var(--rt-muted);
   font-size: 13px;
   font-weight: 800;
+}
+
+.rt-field-hint {
+  min-height: 17px;
+  color: var(--rt-muted);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.rt-field-hint.empty {
+  visibility: hidden;
+}
+
+.rt-field-hint.error {
+  color: var(--rt-danger);
 }
 
 .rt-form label.wide,
@@ -567,6 +621,145 @@
 
 .rt-actions.vertical {
   flex-direction: column;
+}
+
+.rt-side-stack,
+.rt-review-list,
+.rt-participant-list {
+  display: grid;
+  gap: 12px;
+}
+
+.rt-user-list-item {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) 22px;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--rt-border);
+  border-radius: 8px;
+  background: var(--rt-surface-soft);
+  color: var(--rt-text);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.rt-user-list-item:hover {
+  border-color: rgba(47, 95, 56, 0.34);
+  background: #fff;
+}
+
+.rt-user-list-item > span,
+.rt-user-list-item strong,
+.rt-user-list-item em {
+  min-width: 0;
+  display: block;
+}
+
+.rt-user-list-item strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rt-user-list-item em {
+  margin-top: 3px;
+  color: var(--rt-muted);
+  font-size: 12px;
+  font-style: normal;
+}
+
+.rt-user-list-item .rt-icon {
+  width: 18px;
+  height: 18px;
+  color: var(--rt-muted);
+}
+
+.rt-public-profile {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: clamp(22px, 4vw, 34px);
+  border: 1px solid var(--rt-border);
+  border-radius: 8px;
+  background: var(--rt-surface);
+  box-shadow: var(--rt-shadow);
+}
+
+.rt-public-profile h1 {
+  margin: 4px 0;
+  font-size: clamp(28px, 4vw, 44px);
+  line-height: 1.05;
+}
+
+.rt-public-profile span {
+  color: var(--rt-accent-strong);
+  font-size: 13px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.rt-public-profile p {
+  margin: 0;
+  color: var(--rt-muted);
+}
+
+.rt-review-target {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--rt-border);
+  border-radius: 8px;
+  background: var(--rt-surface-soft);
+}
+
+.rt-review-target strong,
+.rt-review-target span {
+  display: block;
+}
+
+.rt-review-target strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rt-review-target span {
+  margin-top: 3px;
+  color: var(--rt-muted);
+  font-size: 12px;
+}
+
+.rt-stars,
+.rt-review-done {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  color: #b7791f;
+  font-size: 18px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.rt-stars button {
+  width: 26px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #b7791f;
+  cursor: pointer;
+  font: inherit;
+  line-height: 1;
+}
+
+.rt-stars button:disabled {
+  cursor: default;
+  opacity: 0.5;
 }
 
 .rt-primary,
@@ -672,10 +865,48 @@
   color: var(--rt-muted);
 }
 
+.rt-avatar-upload {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 10px;
+}
+
+.rt-avatar-upload input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.rt-avatar-upload span {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 12px;
+  border: 1px solid var(--rt-border);
+  border-radius: 8px;
+  background: var(--rt-surface);
+  color: var(--rt-text);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 800;
+}
+
 .rt-avatar {
   width: 38px;
   height: 38px;
   font-size: 13px;
+  letter-spacing: 0;
+}
+
+.rt-avatar img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
 }
 
 .rt-avatar.large {
@@ -805,11 +1036,19 @@
 
   .rt-workout-header,
   .rt-card-main,
-  .rt-request {
+  .rt-request,
+  .rt-review-target,
+  .rt-user-list-item {
     grid-template-columns: 1fr;
   }
 
+  .rt-public-profile {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
   .rt-card-footer,
+  .rt-page-head,
   .rt-section-head {
     align-items: flex-start;
     flex-direction: column;

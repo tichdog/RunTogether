@@ -47,6 +47,8 @@ export function workoutPayload(row) {
     id: row.id,
     organizerId: row.organizer_id,
     organizerName: row.organizer_name,
+    organizer: row.organizer || null,
+    participants: row.participants || [],
     title: row.title,
     description: row.description,
     startAt: row.start_at,

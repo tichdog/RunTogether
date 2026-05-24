@@ -48,7 +48,7 @@ export function UsersList({ onSelect }) {
 
       <Card style={{ padding: 0, overflow: "hidden" }}>
         <div className="users-list-header" style={headerGrid}>
-          {["№", "Пользователь", "Email", "Роль", "Статус", "Верификация"].map(h => <div key={h}>{h}</div>)}
+          {["№", "Пользователь", "Email", "Роль", "Рейтинг", "Статус", "Верификация"].map(h => <div key={h}>{h}</div>)}
         </div>
 
         {filtered.map((user, i) => (
@@ -60,6 +60,9 @@ export function UsersList({ onSelect }) {
             </div>
             <span className="user-cell user-cell-email" style={{ fontSize: 13, color: T.textMuted }}>{user.email || "скрыто"}</span>
             <div className="user-cell user-cell-role"><Badge text={ROLE_LABELS[user.role]} colors={ROLE_COLORS[user.role]} /></div>
+            <span className="user-cell user-cell-rating" style={{ fontSize: 13, color: T.warning, fontWeight: 800 }}>
+              {user.stats?.rating ? `★ ${Number(user.stats.rating).toFixed(1)}` : "—"}
+            </span>
             <div className="user-cell user-cell-status"><StatusBadge status={user.status} /></div>
             <span className="user-cell user-cell-verified" style={{ fontSize: 12, color: user.phoneVerified ? T.success : T.textHint, fontWeight: 600 }}>
               {STATUS_LABELS[user.verified] || user.verified}
@@ -74,7 +77,7 @@ export function UsersList({ onSelect }) {
 
 const headerGrid = {
   display: "grid",
-  gridTemplateColumns: "64px 1fr 1.4fr 120px 110px 140px",
+  gridTemplateColumns: "64px 1fr 1.4fr 120px 86px 110px 140px",
   padding: "10px 18px", fontSize: 11.5, color: T.textHint,
   fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em",
   background: T.surfaceAlt, borderBottom: `1px solid ${T.border}`,
@@ -83,7 +86,7 @@ const headerGrid = {
 function rowGrid(index, total) {
   return {
     display: "grid",
-    gridTemplateColumns: "64px 1fr 1.4fr 120px 110px 140px",
+    gridTemplateColumns: "64px 1fr 1.4fr 120px 86px 110px 140px",
     padding: "11px 18px", alignItems: "center", cursor: "pointer",
     borderBottom: index < total - 1 ? `1px solid ${T.border}` : "none",
   };

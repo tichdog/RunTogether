@@ -8,6 +8,79 @@ const EMPTY_FILTERS = {
   sort: "time",
 };
 
+const NAME_RE = /^\p{L}{2,15}$/u;
+const LAST_NAME_RE = /^\p{L}{2,15}(?:-\p{L}{2,15})?$/u;
+
+const USER_TAB_PATHS = {
+  home: "/me",
+  workouts: "/workouts",
+  organized: "/organized",
+  participating: "/participating",
+  create: "/workouts/new",
+  profile: "/profile",
+};
+
+function routeFromPath(pathname) {
+  const path = normalizeUserPath(pathname);
+  const organizedMatch = path.match(/^\/organized\/(\d+)$/);
+  const participatingMatch = path.match(/^\/participating\/(\d+)$/);
+  const userMatch = path.match(/^\/users\/(\d+)$/);
+  const workoutMatch = path.match(/^\/workouts\/(\d+)(?:\/(edit|requests))?$/);
+
+  if (userMatch) {
+    return { path, activeTab: "workouts", screen: "userProfile", selectedId: userMatch[1], mode: "create" };
+  }
+
+  if (organizedMatch) {
+    return { path, activeTab: "organized", screen: "detail", selectedId: organizedMatch[1], mode: "create" };
+  }
+
+  if (participatingMatch) {
+    return { path, activeTab: "participating", screen: "detail", selectedId: participatingMatch[1], mode: "create" };
+  }
+
+  if (workoutMatch) {
+    const [, workoutId, action] = workoutMatch;
+
+    if (action === "edit") {
+      return { path, activeTab: "create", screen: "create", selectedId: workoutId, mode: "edit" };
+    }
+
+    if (action === "requests") {
+      return { path, activeTab: "workouts", screen: "requests", selectedId: workoutId, mode: "create" };
+    }
+
+    return { path, activeTab: "workouts", screen: "detail", selectedId: workoutId, mode: "create" };
+  }
+
+  if (path === USER_TAB_PATHS.workouts) {
+    return { path, activeTab: "workouts", screen: "workouts", selectedId: null, mode: "create" };
+  }
+
+  if (path === USER_TAB_PATHS.organized || path === "/my-workouts") {
+    return { path: USER_TAB_PATHS.organized, activeTab: "organized", screen: "organized", selectedId: null, mode: "create" };
+  }
+
+  if (path === USER_TAB_PATHS.participating) {
+    return { path, activeTab: "participating", screen: "participating", selectedId: null, mode: "create" };
+  }
+
+  if (path === USER_TAB_PATHS.create) {
+    return { path, activeTab: "create", screen: "create", selectedId: null, mode: "create" };
+  }
+
+  if (path === USER_TAB_PATHS.profile) {
+    return { path, activeTab: "profile", screen: "profile", selectedId: null, mode: "create" };
+  }
+
+  return { path: USER_TAB_PATHS.home, activeTab: "home", screen: "home", selectedId: null, mode: "create" };
+}
+
+function normalizeUserPath(pathname) {
+  const path = pathname.replace(/\/+$/, "") || "/";
+  return path === "/" ? USER_TAB_PATHS.home : path;
+}
+
 function defaultWorkoutForm() {
   const start = new Date(Date.now() + 24 * 60 * 60 * 1000);
   start.setMinutes(0, 0, 0);
@@ -29,26 +102,52 @@ function defaultWorkoutForm() {
 
 export function UserApp({ user, onLogout }) {
   const [currentUser, setCurrentUser] = useState(user);
-  const [activeTab, setActiveTab] = useState("home");
-  const [screen, setScreen] = useState("home");
+  const [route, setRoute] = useState(() => routeFromPath(window.location.pathname));
   const [workouts, setWorkouts] = useState([]);
-  const [selectedId, setSelectedId] = useState(null);
   const [requests, setRequests] = useState([]);
+  const [reviewTargets, setReviewTargets] = useState([]);
+  const [publicProfile, setPublicProfile] = useState(null);
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [form, setForm] = useState(defaultWorkoutForm);
   const [profile, setProfile] = useState(() => profileFromUser(user));
-  const [mode, setMode] = useState("create");
   const [loading, setLoading] = useState(true);
+  const [profileLoading, setProfileLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState(null);
+  const { activeTab, screen: routeScreen, selectedId, mode } = route;
+
+  const navigate = useCallback((path, { replace = false } = {}) => {
+    const nextRoute = routeFromPath(path);
+    setRoute(nextRoute);
+    window.history[replace ? "replaceState" : "pushState"]({}, "", nextRoute.path);
+  }, []);
 
   const selectedWorkout = useMemo(
     () => workouts.find(workout => Number(workout.id) === Number(selectedId)) || null,
     [selectedId, workouts],
   );
+  const screen = routeScreen === "detail" && selectedWorkout && Number(selectedWorkout.organizerId) === Number(currentUser.id)
+    ? "organizer"
+    : routeScreen;
 
-  const myWorkouts = useMemo(
-    () => workouts.filter(workout => Number(workout.organizerId) === Number(currentUser.id)),
+  const organizedWorkouts = useMemo(
+    () => workouts
+      .filter(workout => Number(workout.organizerId) === Number(currentUser.id))
+      .sort((left, right) => new Date(right.createdAt || 0) - new Date(left.createdAt || 0)),
+    [currentUser.id, workouts],
+  );
+
+  const participatingWorkouts = useMemo(
+    () => workouts
+      .filter(workout =>
+        Number(workout.organizerId) !== Number(currentUser.id) &&
+        ["pending", "confirmed"].includes(workout.participantStatus)
+      )
+      .sort((left, right) => {
+        const leftConfirmed = left.participantStatus === "confirmed" ? 0 : 1;
+        const rightConfirmed = right.participantStatus === "confirmed" ? 0 : 1;
+        return leftConfirmed - rightConfirmed || new Date(left.startAt) - new Date(right.startAt);
+      }),
     [currentUser.id, workouts],
   );
 
@@ -87,21 +186,133 @@ export function UserApp({ user, onLogout }) {
   }, [loadWorkouts]);
 
   useEffect(() => {
+    if (window.location.pathname !== route.path) {
+      window.history.replaceState({}, "", route.path);
+    }
+  }, [route.path]);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      setRoute(routeFromPath(window.location.pathname));
+      setMessage(null);
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
+  useEffect(() => {
     setCurrentUser(user);
     setProfile(profileFromUser(user));
   }, [user]);
 
+  useEffect(() => {
+    if (screen === "create" && mode === "edit" && selectedWorkout) {
+      setForm(formFromWorkout(selectedWorkout));
+    }
+  }, [mode, screen, selectedWorkout]);
+
+  useEffect(() => {
+    if (!selectedId || !["detail", "requests", "create"].includes(routeScreen) || selectedWorkout || loading) return;
+
+    let ignore = false;
+    api.workout(selectedId)
+      .then(data => {
+        if (ignore || !data.workout) return;
+        setWorkouts(prev => {
+          const next = prev.filter(workout => Number(workout.id) !== Number(data.workout.id));
+          return [data.workout, ...next];
+        });
+      })
+      .catch(error => {
+        if (!ignore) setMessage({ type: "error", text: error.message });
+      });
+
+    return () => {
+      ignore = true;
+    };
+  }, [loading, routeScreen, selectedId, selectedWorkout]);
+
+  useEffect(() => {
+    if (screen !== "requests" || !selectedWorkout) return;
+
+    let ignore = false;
+    setSaving(true);
+    setMessage(null);
+
+    api.workoutRequests(selectedWorkout.id)
+      .then(data => {
+        if (!ignore) setRequests(data.requests || []);
+      })
+      .catch(error => {
+        if (!ignore) setMessage({ type: "error", text: error.message });
+      })
+      .finally(() => {
+        if (!ignore) setSaving(false);
+      });
+
+    return () => {
+      ignore = true;
+    };
+  }, [screen, selectedWorkout]);
+
+  useEffect(() => {
+    if (!selectedWorkout || !["detail", "organizer"].includes(screen) || selectedWorkout.status !== "completed") {
+      setReviewTargets([]);
+      return;
+    }
+
+    let ignore = false;
+    api.reviewTargets(selectedWorkout.id)
+      .then(data => {
+        if (!ignore) setReviewTargets(data.reviewTargets || []);
+      })
+      .catch(() => {
+        if (!ignore) setReviewTargets([]);
+      });
+
+    return () => {
+      ignore = true;
+    };
+  }, [screen, selectedWorkout]);
+
+  useEffect(() => {
+    if (routeScreen !== "userProfile" || !selectedId) {
+      setPublicProfile(null);
+      return;
+    }
+
+    let ignore = false;
+    setProfileLoading(true);
+    setMessage(null);
+
+    api.user(selectedId)
+      .then(data => {
+        if (!ignore) setPublicProfile(data.user);
+      })
+      .catch(error => {
+        if (!ignore) {
+          setPublicProfile(null);
+          setMessage({ type: "error", text: error.message });
+        }
+      })
+      .finally(() => {
+        if (!ignore) setProfileLoading(false);
+      });
+
+    return () => {
+      ignore = true;
+    };
+  }, [routeScreen, selectedId]);
+
   const openWorkout = (workout) => {
-    setSelectedId(workout.id);
-    setScreen(Number(workout.organizerId) === Number(currentUser.id) ? "organizer" : "detail");
+    navigate(`/workouts/${workout.id}`);
   };
 
   const goTab = (tab) => {
-    setActiveTab(tab);
-    setScreen(tab);
+    navigate(USER_TAB_PATHS[tab] || USER_TAB_PATHS.home);
     setMessage(null);
     if (tab === "create") {
-      setMode("create");
       setForm(defaultWorkoutForm());
     }
   };
@@ -120,9 +331,7 @@ export function UserApp({ user, onLogout }) {
         const next = prev.filter(workout => Number(workout.id) !== Number(result.workout.id));
         return [result.workout, ...next];
       });
-      setSelectedId(result.workout.id);
-      setScreen("organizer");
-      setActiveTab("create");
+      navigate(`/workouts/${result.workout.id}`);
       setMessage({ type: "success", text: mode === "edit" ? "Тренировка обновлена" : "Тренировка опубликована" });
     } catch (error) {
       setMessage({ type: "error", text: error.message });
@@ -133,10 +342,8 @@ export function UserApp({ user, onLogout }) {
 
   const editWorkout = () => {
     if (!selectedWorkout) return;
-    setMode("edit");
     setForm(formFromWorkout(selectedWorkout));
-    setScreen("create");
-    setActiveTab("create");
+    navigate(`/workouts/${selectedWorkout.id}/edit`);
   };
 
   const cancelWorkout = async () => {
@@ -184,19 +391,18 @@ export function UserApp({ user, onLogout }) {
     }
   };
 
-  const openRequests = async () => {
+  const openRequests = () => {
     if (!selectedWorkout) return;
-    setSaving(true);
-    setMessage(null);
-    try {
-      const data = await api.workoutRequests(selectedWorkout.id);
-      setRequests(data.requests || []);
-      setScreen("requests");
-    } catch (error) {
-      setMessage({ type: "error", text: error.message });
-    } finally {
-      setSaving(false);
+    navigate(`/workouts/${selectedWorkout.id}/requests`);
+  };
+
+  const openUserProfile = (userId) => {
+    if (!userId) return;
+    if (Number(userId) === Number(currentUser.id)) {
+      goTab("profile");
+      return;
     }
+    navigate(`/users/${userId}`);
   };
 
   const respondToRequest = async (requestId, status) => {
@@ -218,12 +424,20 @@ export function UserApp({ user, onLogout }) {
 
   const saveProfile = async (event) => {
     event.preventDefault();
+    const firstName = profile.firstName.trim();
+    const lastName = profile.lastName.trim();
+
+    if (!NAME_RE.test(firstName) || !LAST_NAME_RE.test(lastName) || !["male", "female"].includes(profile.gender)) {
+      setMessage({ type: "error", text: "Проверьте имя, фамилию и пол перед сохранением." });
+      return;
+    }
+
     setSaving(true);
     setMessage(null);
     try {
       const result = await api.updateMe({
-        firstName: profile.firstName,
-        lastName: profile.lastName,
+        firstName,
+        lastName,
         gender: profile.gender,
         phone: profile.phone,
         privacy: {
@@ -234,6 +448,40 @@ export function UserApp({ user, onLogout }) {
       setCurrentUser(result.user);
       setProfile(profileFromUser(result.user));
       setMessage({ type: "success", text: "Профиль сохранен" });
+    } catch (error) {
+      setMessage({ type: "error", text: error.message });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const saveReview = async (revieweeId, rating) => {
+    if (!selectedWorkout) return;
+
+    setSaving(true);
+    setMessage(null);
+    try {
+      await api.createReview(selectedWorkout.id, { revieweeId, rating });
+      const data = await api.reviewTargets(selectedWorkout.id);
+      setReviewTargets(data.reviewTargets || []);
+      setMessage({ type: "success", text: "Оценка сохранена" });
+    } catch (error) {
+      setMessage({ type: "error", text: error.message });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const saveAvatar = async (file) => {
+    if (!file) return;
+
+    setSaving(true);
+    setMessage(null);
+    try {
+      const result = await api.updateMyAvatar(file);
+      setCurrentUser(result.user);
+      setProfile(profileFromUser(result.user));
+      setMessage({ type: "success", text: "Аватарка обновлена" });
     } catch (error) {
       setMessage({ type: "error", text: error.message });
     } finally {
@@ -269,7 +517,7 @@ export function UserApp({ user, onLogout }) {
           <HomeScreen
             user={currentUser}
             workouts={visibleWorkouts}
-            myWorkouts={myWorkouts}
+            organizedWorkouts={organizedWorkouts}
             loading={loading}
             onOpen={openWorkout}
             onCreate={() => goTab("create")}
@@ -290,13 +538,35 @@ export function UserApp({ user, onLogout }) {
           />
         )}
 
+        {screen === "organized" && (
+          <OrganizedWorkoutsScreen
+            workouts={organizedWorkouts}
+            loading={loading}
+            onOpen={workout => navigate(`/organized/${workout.id}`)}
+            onCreate={() => goTab("create")}
+          />
+        )}
+
+        {screen === "participating" && (
+          <ParticipatingWorkoutsScreen
+            workouts={participatingWorkouts}
+            loading={loading}
+            saving={saving}
+            onOpen={workout => navigate(`/participating/${workout.id}`)}
+            onLeave={leaveWorkout}
+          />
+        )}
+
         {screen === "detail" && selectedWorkout && (
           <WorkoutDetail
             workout={selectedWorkout}
+            reviewTargets={reviewTargets}
             saving={saving}
+            onOpenUser={openUserProfile}
             onJoin={joinWorkout}
             onLeave={leaveWorkout}
-            onBack={() => goTab("workouts")}
+            onReview={saveReview}
+            onBack={() => navigate(activeTab === "participating" ? USER_TAB_PATHS.participating : USER_TAB_PATHS.workouts)}
           />
         )}
 
@@ -313,11 +583,14 @@ export function UserApp({ user, onLogout }) {
         {screen === "organizer" && selectedWorkout && (
           <OrganizerScreen
             workout={selectedWorkout}
+            reviewTargets={reviewTargets}
             saving={saving}
+            onOpenUser={openUserProfile}
             onEdit={editWorkout}
             onCancel={cancelWorkout}
             onRequests={openRequests}
-            onBack={() => goTab("home")}
+            onReview={saveReview}
+            onBack={() => navigate(activeTab === "organized" ? USER_TAB_PATHS.organized : USER_TAB_PATHS.workouts)}
           />
         )}
 
@@ -326,7 +599,7 @@ export function UserApp({ user, onLogout }) {
             workout={selectedWorkout}
             requests={requests}
             saving={saving}
-            onBack={() => setScreen("organizer")}
+            onBack={() => navigate(`/workouts/${selectedWorkout.id}`)}
             onRespond={respondToRequest}
           />
         )}
@@ -338,7 +611,16 @@ export function UserApp({ user, onLogout }) {
             setProfile={setProfile}
             saving={saving}
             onSubmit={saveProfile}
+            onAvatarChange={saveAvatar}
             onLogout={onLogout}
+          />
+        )}
+
+        {screen === "userProfile" && (
+          <PublicProfileScreen
+            user={publicProfile}
+            loading={profileLoading}
+            onBack={() => navigate(USER_TAB_PATHS.workouts)}
           />
         )}
       </main>
@@ -350,11 +632,11 @@ export function UserApp({ user, onLogout }) {
   );
 }
 
-function HomeScreen({ user, workouts, myWorkouts, loading, onOpen, onCreate }) {
+function HomeScreen({ user, workouts, organizedWorkouts, loading, onOpen, onCreate }) {
   const nextWorkouts = workouts
     .filter(workout => Number(workout.organizerId) !== Number(user.id) && isJoinableStatus(workout.status))
     .slice(0, 3);
-  const nextOrganizerWorkout = myWorkouts.find(workout => !["completed", "cancelled"].includes(workout.status));
+  const nextOrganizerWorkout = organizedWorkouts.find(workout => !["completed", "cancelled"].includes(workout.status));
 
   return (
     <section className="rt-page">
@@ -378,7 +660,7 @@ function HomeScreen({ user, workouts, myWorkouts, loading, onOpen, onCreate }) {
         </section>
 
         <section>
-          <SectionHead title="Вы организатор" caption={`${myWorkouts.length} создано`} />
+          <SectionHead title="Вы организатор" caption={`${organizedWorkouts.length} создано`} />
           {nextOrganizerWorkout ? (
             <WorkoutCard workout={nextOrganizerWorkout} onOpen={() => onOpen(nextOrganizerWorkout)} />
           ) : (
@@ -428,7 +710,48 @@ function WorkoutsScreen({ workouts, userId, filters, setFilters, loading, saving
   );
 }
 
-function WorkoutDetail({ workout, saving, onJoin, onLeave, onBack }) {
+function OrganizedWorkoutsScreen({ workouts, loading, onOpen, onCreate }) {
+  const activeCount = workouts.filter(workout => !["completed", "cancelled"].includes(workout.status)).length;
+
+  return (
+    <section className="rt-page">
+      <div className="rt-page-head">
+        <SectionHead title="Организую" caption={loading ? "Загружаем..." : `${workouts.length} создано · ${activeCount} активных`} />
+        <button className="rt-primary" type="button" onClick={onCreate}>
+          <Icon name="plus" />
+          Создать тренировку
+        </button>
+      </div>
+      <WorkoutList
+        workouts={workouts}
+        onOpen={onOpen}
+        empty="Вы пока не организовали тренировок"
+      />
+    </section>
+  );
+}
+
+function ParticipatingWorkoutsScreen({ workouts, loading, saving, onOpen, onLeave }) {
+  const confirmedCount = workouts.filter(workout => workout.participantStatus === "confirmed").length;
+  const pendingCount = workouts.filter(workout => workout.participantStatus === "pending").length;
+
+  return (
+    <section className="rt-page">
+      <div className="rt-page-head">
+        <SectionHead title="Участвую" caption={loading ? "Загружаем..." : `${confirmedCount} подтверждено · ${pendingCount} на рассмотрении`} />
+      </div>
+      <WorkoutList
+        workouts={workouts}
+        onOpen={onOpen}
+        saving={saving}
+        onLeave={onLeave}
+        empty="У вас пока нет заявок на тренировки"
+      />
+    </section>
+  );
+}
+
+function WorkoutDetail({ workout, reviewTargets, saving, onOpenUser, onJoin, onLeave, onReview, onBack }) {
   const canJoin = isJoinableStatus(workout.status) && !["pending", "confirmed"].includes(workout.participantStatus);
   const canLeave = ["pending", "confirmed"].includes(workout.participantStatus);
 
@@ -438,57 +761,73 @@ function WorkoutDetail({ workout, saving, onJoin, onLeave, onBack }) {
         <Icon name="arrow" />
         Ко всем тренировкам
       </button>
-      <WorkoutHeader workout={workout} />
+      <WorkoutHeader workout={workout} onOpenOrganizer={() => onOpenUser(workout.organizerId)} />
       <div className="rt-detail-grid">
-        <InfoPanel workout={workout} />
-        <div className="rt-panel">
-          <SectionHead title="Участие" caption={participantLabel(workout.participantStatus) || statusLabel(workout.status)} />
-          <p className="rt-muted">
-            Организатор рассмотрит заявку и подтвердит участие. Если планы изменятся, заявку можно отменить.
-          </p>
-          <div className="rt-actions">
-            {canJoin && (
-              <button className="rt-primary" type="button" disabled={saving} onClick={() => onJoin(workout)}>
-                Подать заявку
-              </button>
-            )}
-            {canLeave && (
-              <button className="rt-secondary" type="button" disabled={saving} onClick={() => onLeave(workout)}>
-                Отменить участие
-              </button>
-            )}
+        <div className="rt-side-stack">
+          <InfoPanel workout={workout} />
+          <ParticipantsPanel workout={workout} onOpenUser={onOpenUser} />
+        </div>
+        <div className="rt-side-stack">
+          <div className="rt-panel">
+            <SectionHead title="Участие" caption={participantLabel(workout.participantStatus) || statusLabel(workout.status)} />
+            <p className="rt-muted">
+              Организатор рассмотрит заявку и подтвердит участие. Если планы изменятся, заявку можно отменить.
+            </p>
+            <div className="rt-actions">
+              {canJoin && (
+                <button className="rt-primary" type="button" disabled={saving} onClick={() => onJoin(workout)}>
+                  Подать заявку
+                </button>
+              )}
+              {canLeave && (
+                <button className="rt-secondary" type="button" disabled={saving} onClick={() => onLeave(workout)}>
+                  Отменить участие
+                </button>
+              )}
+            </div>
           </div>
+          {workout.status === "completed" && (
+            <ReviewPanel targets={reviewTargets} saving={saving} onReview={onReview} />
+          )}
         </div>
       </div>
     </section>
   );
 }
 
-function OrganizerScreen({ workout, saving, onEdit, onCancel, onRequests, onBack }) {
+function OrganizerScreen({ workout, reviewTargets, saving, onOpenUser, onEdit, onCancel, onRequests, onReview, onBack }) {
   return (
     <section className="rt-page">
       <button className="rt-link-button" type="button" onClick={onBack}>
         <Icon name="arrow" />
         На главную
       </button>
-      <WorkoutHeader workout={workout} organizer />
+      <WorkoutHeader workout={workout} organizer onOpenOrganizer={() => onOpenUser(workout.organizerId)} />
       <div className="rt-detail-grid">
-        <InfoPanel workout={workout} />
-        <div className="rt-panel">
-          <SectionHead title="Управление" caption="Заявки и состояние тренировки" />
-          <div className="rt-actions vertical">
-            <button className="rt-primary" type="button" disabled={saving} onClick={onRequests}>
-              <Icon name="users" />
-              Заявки участников
-            </button>
-            <button className="rt-secondary" type="button" disabled={saving || !canEditWorkout(workout)} onClick={onEdit}>
-              <Icon name="edit" />
-              Редактировать
-            </button>
-            <button className="rt-danger" type="button" disabled={saving || workout.status === "completed" || workout.status === "cancelled"} onClick={onCancel}>
-              Отменить тренировку
-            </button>
+        <div className="rt-side-stack">
+          <InfoPanel workout={workout} />
+          <ParticipantsPanel workout={workout} onOpenUser={onOpenUser} />
+        </div>
+        <div className="rt-side-stack">
+          <div className="rt-panel">
+            <SectionHead title="Управление" caption="Заявки и состояние тренировки" />
+            <div className="rt-actions vertical">
+              <button className="rt-primary" type="button" disabled={saving} onClick={onRequests}>
+                <Icon name="users" />
+                Заявки участников
+              </button>
+              <button className="rt-secondary" type="button" disabled={saving || !canEditWorkout(workout)} onClick={onEdit}>
+                <Icon name="edit" />
+                Редактировать
+              </button>
+              <button className="rt-danger" type="button" disabled={saving || workout.status === "completed" || workout.status === "cancelled"} onClick={onCancel}>
+                Отменить тренировку
+              </button>
+            </div>
           </div>
+          {workout.status === "completed" && (
+            <ReviewPanel targets={reviewTargets} saving={saving} onReview={onReview} />
+          )}
         </div>
       </div>
     </section>
@@ -526,6 +865,148 @@ function RequestsScreen({ workout, requests, saving, onBack, onRespond }) {
   );
 }
 
+function PublicProfileScreen({ user, loading, onBack }) {
+  if (loading) {
+    return (
+      <section className="rt-page">
+        <button className="rt-link-button" type="button" onClick={onBack}>
+          <Icon name="arrow" />
+          К тренировкам
+        </button>
+        <div className="rt-panel">Загрузка профиля...</div>
+      </section>
+    );
+  }
+
+  if (!user) {
+    return (
+      <section className="rt-page">
+        <button className="rt-link-button" type="button" onClick={onBack}>
+          <Icon name="arrow" />
+          К тренировкам
+        </button>
+        <EmptyState title="Профиль не найден" text="Пользователь удален или недоступен." />
+      </section>
+    );
+  }
+
+  return (
+    <section className="rt-page">
+      <button className="rt-link-button" type="button" onClick={onBack}>
+        <Icon name="arrow" />
+        К тренировкам
+      </button>
+      <div className="rt-public-profile">
+        <Avatar user={user} large />
+        <div>
+          <span>{roleLabel(user.role)}</span>
+          <h1>{user.name}</h1>
+          <p>{user.email || "Email скрыт"}{user.phone ? ` · ${user.phone}` : ""}</p>
+        </div>
+      </div>
+      <StatsGrid stats={user.stats} />
+    </section>
+  );
+}
+
+function ParticipantsPanel({ workout, onOpenUser }) {
+  const organizer = workout.organizer || {
+    id: workout.organizerId,
+    name: workout.organizerName,
+    initials: initials(workout.organizerName),
+    stats: {},
+  };
+  const participants = workout.participants || [];
+
+  return (
+    <div className="rt-panel">
+      <SectionHead title="Участники" caption={`${participants.length} подтверждено`} />
+      <div className="rt-participant-list">
+        <UserListItem user={organizer} label="Организатор" onOpen={() => onOpenUser(organizer.id)} />
+        {participants.map(participant => (
+          <UserListItem
+            key={participant.id}
+            user={participant}
+            label="Участник"
+            onOpen={() => onOpenUser(participant.id)}
+          />
+        ))}
+      </div>
+      {!participants.length && (
+        <p className="rt-muted">Подтвержденных участников пока нет.</p>
+      )}
+    </div>
+  );
+}
+
+function UserListItem({ user, label, onOpen }) {
+  return (
+    <button className="rt-user-list-item" type="button" onClick={onOpen}>
+      <Avatar user={user} />
+      <span>
+        <strong>{user.name}</strong>
+        <em>{label} · рейтинг {formatRating(user.stats?.rating)}</em>
+      </span>
+      <Icon name="arrowRight" />
+    </button>
+  );
+}
+
+function ReviewPanel({ targets = [], saving, onReview }) {
+  const ratedCount = targets.filter(target => target.review).length;
+
+  return (
+    <div className="rt-panel">
+      <SectionHead title="Оценки" caption={targets.length ? `${ratedCount}/${targets.length} оценено` : "после тренировки"} />
+      {!targets.length ? (
+        <p className="rt-muted">Оценить можно только организатора или подтвержденных участников завершенной тренировки.</p>
+      ) : (
+        <div className="rt-review-list">
+          {targets.map(target => (
+            <ReviewTarget
+              key={target.user.id}
+              target={target}
+              saving={saving}
+              onReview={rating => onReview(target.user.id, rating)}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ReviewTarget({ target, saving, onReview }) {
+  const user = target.user;
+
+  return (
+    <article className="rt-review-target">
+      <Avatar user={user} />
+      <div>
+        <strong>{user.name}</strong>
+        <span>{target.isOrganizer ? "Организатор" : "Участник"} · рейтинг {formatRating(user.stats?.rating)}</span>
+      </div>
+      {target.review ? (
+        <span className="rt-review-done">{stars(target.review.rating)}</span>
+      ) : (
+        <StarPicker disabled={saving} onChange={onReview} />
+      )}
+    </article>
+  );
+}
+
+function StarPicker({ disabled, onChange }) {
+  return (
+    <div className="rt-stars" aria-label="Оценка">
+      {[1, 2, 3, 4, 5].map(value => (
+        <button key={value} type="button" disabled={disabled} onClick={() => onChange(value)} aria-label={`${value} из 5`}>
+          ★
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function WorkoutForm({ mode, form, setForm, saving, onSubmit }) {
   const set = key => event => setForm(prev => ({ ...prev, [key]: event.target.value }));
 
@@ -542,7 +1023,7 @@ function WorkoutForm({ mode, form, setForm, saving, onSubmit }) {
         </label>
         <label>
           <span>Длительность, мин</span>
-          <input value={form.durationMinutes} onChange={set("durationMinutes")} type="number" min="15" step="5" required />
+          <input value={form.durationMinutes} onChange={set("durationMinutes")} type="number" min="15" max="1440" step="5" required />
         </label>
         <label>
           <span>Сложность</span>
@@ -566,11 +1047,11 @@ function WorkoutForm({ mode, form, setForm, saving, onSubmit }) {
         </label>
         <label>
           <span>Дистанция, км</span>
-          <input value={form.distanceKm} onChange={set("distanceKm")} type="number" min="0.5" step="0.1" required />
+          <input value={form.distanceKm} onChange={set("distanceKm")} type="number" min="0.1" max="99999.99" step="0.01" required />
         </label>
         <label>
           <span>Темп, мин/км</span>
-          <input value={form.paceMinPerKm} onChange={set("paceMinPerKm")} type="number" min="3" step="0.1" required />
+          <input value={form.paceMinPerKm} onChange={set("paceMinPerKm")} type="number" min="0.1" max="99.99" step="0.01" required />
         </label>
         <label>
           <span>Лимит участников</span>
@@ -590,11 +1071,26 @@ function WorkoutForm({ mode, form, setForm, saving, onSubmit }) {
   );
 }
 
-function ProfileScreen({ user, profile, setProfile, saving, onSubmit, onLogout }) {
+function ProfileScreen({ user, profile, setProfile, saving, onSubmit, onAvatarChange, onLogout }) {
   const set = key => event => {
     const value = event.target.type === "checkbox" ? event.target.checked : event.target.value;
     setProfile(prev => ({ ...prev, [key]: value }));
   };
+  const uploadAvatar = event => {
+    const [file] = event.target.files || [];
+    onAvatarChange?.(file);
+    event.target.value = "";
+  };
+  const firstNameError = profile.firstName && !NAME_RE.test(profile.firstName.trim())
+    ? "Имя: только буквы, от 2 до 15 символов."
+    : "";
+  const lastNameError = profile.lastName && !LAST_NAME_RE.test(profile.lastName.trim())
+    ? "Фамилия: буквы от 2 до 15 символов. Двойная фамилия пишется через дефис."
+    : "";
+  const profileIsValid =
+    NAME_RE.test(profile.firstName.trim()) &&
+    LAST_NAME_RE.test(profile.lastName.trim()) &&
+    ["male", "female"].includes(profile.gender);
 
   return (
     <section className="rt-page">
@@ -603,24 +1099,29 @@ function ProfileScreen({ user, profile, setProfile, saving, onSubmit, onLogout }
         <div>
           <h1>{user.name}</h1>
           <span>{user.email || "Email скрыт"}</span>
+          <label className="rt-avatar-upload">
+            <input type="file" accept="image/*" onChange={uploadAvatar} disabled={saving} />
+            <span>{saving ? "Загрузка..." : "Загрузить фото"}</span>
+          </label>
         </div>
       </div>
       <StatsGrid stats={user.stats} />
       <form className="rt-form rt-panel" onSubmit={onSubmit}>
         <label>
           <span>Имя</span>
-          <input value={profile.firstName} onChange={set("firstName")} required />
+          <input value={profile.firstName} onChange={set("firstName")} autoComplete="given-name" required />
+          <small className={`rt-field-hint ${firstNameError ? "error" : "empty"}`}>{firstNameError || " "}</small>
         </label>
         <label>
           <span>Фамилия</span>
-          <input value={profile.lastName} onChange={set("lastName")} required />
+          <input value={profile.lastName} onChange={set("lastName")} autoComplete="family-name" required />
+          <small className={`rt-field-hint ${lastNameError ? "error" : "empty"}`}>{lastNameError || " "}</small>
         </label>
         <label>
           <span>Пол</span>
-          <select value={profile.gender || "other"} onChange={set("gender")}>
+          <select value={profile.gender || "male"} onChange={set("gender")}>
             <option value="male">Мужской</option>
             <option value="female">Женский</option>
-            <option value="other">Другой</option>
           </select>
         </label>
         <label>
@@ -636,7 +1137,7 @@ function ProfileScreen({ user, profile, setProfile, saving, onSubmit, onLogout }
           <span>Скрывать телефон в публичном профиле</span>
         </label>
         <div className="rt-form-actions wide">
-          <button className="rt-primary" type="submit" disabled={saving}>Сохранить профиль</button>
+          <button className="rt-primary" type="submit" disabled={saving || !profileIsValid}>Сохранить профиль</button>
           <button className="rt-secondary" type="button" onClick={onLogout}>Выйти</button>
         </div>
       </form>
@@ -699,11 +1200,13 @@ function WorkoutCard({ workout, userId, saving, onOpen, onJoin, onLeave }) {
   );
 }
 
-function WorkoutHeader({ workout, organizer }) {
+function WorkoutHeader({ workout, organizer, onOpenOrganizer }) {
   return (
     <div className="rt-workout-header">
       <div>
-        <span>{organizer ? "Вы организатор" : workout.organizerName}</span>
+        <button className="rt-header-person" type="button" onClick={onOpenOrganizer}>
+          {organizer ? "Вы организатор" : workout.organizerName}
+        </button>
         <h1>{workout.title}</h1>
         <p>{workout.description || workout.route?.name || "Маршрут будет уточнен организатором"}</p>
       </div>
@@ -735,7 +1238,7 @@ function StatsGrid({ stats = {} }) {
     <div className="rt-stats">
       <Stat value={stats.attendedWorkouts || 0} label="тренировок" />
       <Stat value={Number(stats.distance || 0).toFixed(1)} label="км всего" />
-      <Stat value={stats.rating || "—"} label="рейтинг" />
+      <Stat value={formatRating(stats.rating)} label="рейтинг" />
       <Stat value={stats.organizedWorkouts || 0} label="организовано" />
     </div>
   );
@@ -745,6 +1248,8 @@ function NavItems({ active, onChange, compact = false }) {
   const items = [
     ["home", "home", "Главная"],
     ["workouts", "runner", "Тренировки"],
+    ["organized", "clipboard", "Организую"],
+    ["participating", "check", "Участвую"],
     ["create", "plus", "Создать"],
     ["profile", "user", "Профиль"],
   ];
@@ -831,7 +1336,11 @@ function StatusBadge({ status, participantStatus }) {
 }
 
 function Avatar({ user, large = false }) {
-  return <span className={large ? "rt-avatar large" : "rt-avatar"}>{user.initials || initials(user.name)}</span>;
+  return (
+    <span className={large ? "rt-avatar large" : "rt-avatar"}>
+      {user.avatarUrl ? <img alt="" src={user.avatarUrl} /> : (user.initials || initials(user.name))}
+    </span>
+  );
 }
 
 function workoutPayload(form) {
@@ -875,7 +1384,7 @@ function profileFromUser(user) {
   return {
     firstName: user.firstName || "",
     lastName: user.lastName || "",
-    gender: user.gender || "other",
+    gender: ["male", "female"].includes(user.gender) ? user.gender : "male",
     phone: user.phone || "",
     hideEmail: Boolean(user.privacy?.hide_email),
     hidePhone: Boolean(user.privacy?.hide_phone),
@@ -896,6 +1405,15 @@ function formatDate(value) {
   }).format(new Date(value));
 }
 
+function formatRating(value) {
+  return value ? Number(value).toFixed(1) : "нет";
+}
+
+function stars(value) {
+  const rating = Math.max(0, Math.min(5, Number(value) || 0));
+  return "★".repeat(rating) + "☆".repeat(5 - rating);
+}
+
 function initials(value = "U") {
   return value
     .split(" ")
@@ -907,7 +1425,7 @@ function initials(value = "U") {
 
 function statusLabel(status) {
   return {
-    planned: "Запланирована",
+    planned: "Открыта",
     open: "Открыта",
     full: "Мест нет",
     in_progress: "Идет",
@@ -933,18 +1451,31 @@ function difficultyLabel(value) {
   }[value] || value;
 }
 
+function roleLabel(value) {
+  return {
+    member: "Участник",
+    admin: "Администратор",
+    super_admin: "Супер-админ",
+  }[value] || "Участник";
+}
+
 function titleFor(screen, activeTab, mode) {
   if (screen === "create") return mode === "edit" ? "Редактирование тренировки" : "Создание тренировки";
   return {
     home: "Главная",
     workouts: "Тренировки",
+    organized: "Организую",
+    participating: "Участвую",
     detail: "Карточка тренировки",
     organizer: "Панель организатора",
     requests: "Заявки",
     profile: "Профиль",
+    userProfile: "Профиль пользователя",
   }[screen] || {
     home: "Главная",
     workouts: "Тренировки",
+    organized: "Организую",
+    participating: "Участвую",
     create: "Создать",
     profile: "Профиль",
   }[activeTab] || "RunTogether";
@@ -971,8 +1502,11 @@ function Icon({ name }) {
 
   const icons = {
     arrow: <><path d="M15 18l-6-6 6-6" /><path d="M9 12h12" /></>,
+    arrowRight: <><path d="M9 18l6-6-6-6" /><path d="M3 12h12" /></>,
     home: <><path d="M3 11l9-8 9 8" /><path d="M5 10v10h5v-6h4v6h5V10" /></>,
     runner: <><circle cx="13" cy="4" r="2" /><path d="M9 21l3-7-4-2-2 4" /><path d="M14 8l-2 6 5 2" /><path d="M10 8l4 2 3-2" /></>,
+    clipboard: <><rect x="8" y="3" width="8" height="4" rx="1" /><path d="M9 5H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-3" /><path d="M8 12h8" /><path d="M8 16h5" /></>,
+    check: <><path d="M20 6L9 17l-5-5" /><circle cx="12" cy="12" r="10" /></>,
     plus: <><circle cx="12" cy="12" r="10" /><path d="M12 8v8M8 12h8" /></>,
     user: <><path d="M20 21a8 8 0 0 0-16 0" /><circle cx="12" cy="7" r="4" /></>,
     users: <><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></>,
@@ -981,7 +1515,7 @@ function Icon({ name }) {
     clock: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>,
     route: <><path d="M4 17c5-8 8 4 16-6" /><circle cx="4" cy="17" r="2" /><circle cx="20" cy="11" r="2" /></>,
     bolt: <path d="M13 2L4 14h7l-1 8 10-13h-7z" />,
-    logout: <><path d="M10 17l5-5-5-5" /><path d="M15 12H3" /><path d="M21 3v18" /></>,
+    logout: <><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><path d="M16 17l5-5-5-5" /><path d="M21 12H9" /></>,
   };
 
   return <svg className="rt-icon" {...common}>{icons[name]}</svg>;

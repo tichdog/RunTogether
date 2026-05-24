@@ -1,4 +1,4 @@
-import { requireAdmin, requireAuth, requireSelfOrAdmin, isAdmin } from "@/lib/server/auth";
+import { requireAdmin, requireAuth, isAdmin } from "@/lib/server/auth";
 import { query } from "@/lib/server/db";
 import { badRequest, forbidden, notFound } from "@/lib/server/http-error";
 import { publicUser } from "@/lib/mappers/user";
@@ -6,9 +6,8 @@ import { getUserRole, USER_SELECT } from "@/lib/repositories/users";
 import { json, noContent, route } from "@/lib/server/response";
 
 export const GET = route(async (request, context) => {
-  const user = await requireAuth(request);
+  await requireAuth(request);
   const { id } = await context.params;
-  requireSelfOrAdmin(user, id);
 
   const { rows } = await query(`${USER_SELECT} where u.id = $1`, [id]);
   if (!rows[0]) throw notFound("Пользователь не найден");

@@ -4,6 +4,11 @@ import { badRequest, forbidden, notFound } from "@/lib/server/http-error";
 import { json, route } from "@/lib/server/response";
 import { createNotification } from "@/lib/services/notifications";
 import { getWorkoutRow, isOwnerOrAdmin } from "@/lib/repositories/workouts";
+import {
+  findParticipationConflict,
+  lockParticipationForUser,
+  participationConflictMessage,
+} from "@/lib/services/participation-conflicts";
 
 export const POST = route(async (request, context) => {
   const user = await requireAuth(request);
@@ -14,6 +19,27 @@ export const POST = route(async (request, context) => {
     if (Number(workout.organizer_id) === Number(user.id)) throw badRequest("Организатор уже участвует в тренировке");
     if (!["open", "planned"].includes(workout.status)) throw badRequest("Набор закрыт");
     if (Number(workout.confirmed_count) >= Number(workout.participant_limit)) throw badRequest("Свободных мест нет");
+
+    await lockParticipationForUser(client, user.id);
+
+    const { rows: currentRequests } = await client.query(
+      `select status
+         from workout_participants
+        where workout_id = $1 and user_id = $2
+        for update`,
+      [id, user.id],
+    );
+    if (currentRequests[0]?.status === "confirmed") {
+      throw badRequest("Вы уже участвуете в этой тренировке");
+    }
+    if (currentRequests[0]?.status === "pending") {
+      throw badRequest("Заявка уже на рассмотрении");
+    }
+
+    const conflict = await findParticipationConflict(client, user.id, workout);
+    if (conflict) {
+      throw badRequest(participationConflictMessage(conflict));
+    }
 
     const { rows } = await client.query(
       `insert into workout_participants (workout_id, user_id, status)

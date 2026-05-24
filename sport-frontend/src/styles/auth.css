@@ -92,6 +92,55 @@
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
 }
 
+.password-field {
+  position: relative;
+}
+
+.password-field input {
+  padding-right: 44px;
+}
+
+.password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  transform: translateY(-50%);
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #6b6861;
+  cursor: pointer;
+}
+
+.password-toggle:hover {
+  color: #1a1915;
+  background: #f4f3ef;
+}
+
+.password-toggle:focus-visible {
+  outline: 2px solid rgba(37, 99, 235, 0.5);
+  outline-offset: 2px;
+}
+
+.password-toggle svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.9;
+}
+
+.password-toggle .eye-slash {
+  stroke-width: 2.2;
+}
+
 .field-hint {
   color: #6b6861;
   font-size: 12px;
@@ -101,6 +150,14 @@
 
 .field-hint.error {
   color: #dc2626;
+}
+
+.field-hint.success {
+  color: #15803d;
+}
+
+.field-hint.pending {
+  color: #6b6861;
 }
 
 .gender-group {
@@ -117,7 +174,7 @@
 }
 
 .gender-group label,
-.rules-checkbox {
+.auth-form .rules-checkbox {
   min-height: 42px;
   flex-direction: row;
   align-items: center;
@@ -130,8 +187,9 @@
 }
 
 .gender-group input,
-.rules-checkbox input {
+.auth-form .rules-checkbox input {
   width: 16px;
+  flex: 0 0 16px;
   min-height: auto;
   height: 16px;
   padding: 0;
@@ -176,6 +234,18 @@
   font-size: 13px;
   font-weight: 700;
   line-height: 1.35;
+}
+
+.auth-form .rules-checkbox {
+  align-items: flex-start;
+}
+
+.auth-form .rules-checkbox input {
+  margin-top: 1px;
+}
+
+.rules-checkbox span {
+  flex: 1;
 }
 
 .auth-error {
