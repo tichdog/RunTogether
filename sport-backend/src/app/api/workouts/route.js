@@ -7,7 +7,7 @@ import { parseWorkoutBody } from "@/lib/repositories/workouts";
 import { syncWorkoutStatus, workoutPayload } from "@/lib/services/workouts";
 
 export const GET = route(async request => {
-  await requireAuth(request);
+  const user = await requireAuth(request);
   const { searchParams } = new URL(request.url);
   const lat = searchParams.get("lat") == null ? null : Number(searchParams.get("lat"));
   const lng = searchParams.get("lng") == null ? null : Number(searchParams.get("lng"));
@@ -36,14 +36,19 @@ export const GET = route(async request => {
   if (hasGeo) {
     params.push(lat, lng);
   }
+  const currentUserParam = params.length + 1;
+  params.push(user.id);
 
   const { rows } = await query(
     `select w.*, u.full_name as organizer_name,
             count(wp.id) filter (where wp.status = 'confirmed') as confirmed_count,
+            my_wp.status as participant_status,
+            my_wp.id as participant_request_id,
             ${distanceExpr} as distance_from_user_km
        from workouts w
        join users u on u.id = w.organizer_id
        left join workout_participants wp on wp.workout_id = w.id
+       left join workout_participants my_wp on my_wp.workout_id = w.id and my_wp.user_id = $${currentUserParam}
       where ($1::timestamptz is null or w.start_at >= $1)
         and ($2::timestamptz is null or w.start_at <= $2)
         and ($3::numeric is null or w.distance_km >= $3)
@@ -51,7 +56,7 @@ export const GET = route(async request => {
         and ($5::numeric is null or w.pace_min_per_km <= $5)
         and ($6::text is null or w.difficulty = $6)
         and ($7::numeric is null or ${distanceExpr} <= $7)
-      group by w.id, u.full_name
+      group by w.id, u.full_name, my_wp.status, my_wp.id
       order by ${sort === "distance" ? "distance_from_user_km nulls last, w.start_at" : "w.start_at"}
       limit 100`,
     params,

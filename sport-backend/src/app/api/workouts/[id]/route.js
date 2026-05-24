@@ -7,18 +7,21 @@ import { getWorkoutRow, isOwnerOrAdmin, parseWorkoutBody } from "@/lib/repositor
 import { syncWorkoutStatus, workoutPayload } from "@/lib/services/workouts";
 
 export const GET = route(async (request, context) => {
-  await requireAuth(request);
+  const user = await requireAuth(request);
   const { id } = await context.params;
   await syncWorkoutStatus(query, id);
   const { rows } = await query(
     `select w.*, u.full_name as organizer_name,
-            count(wp.id) filter (where wp.status = 'confirmed') as confirmed_count
+            count(wp.id) filter (where wp.status = 'confirmed') as confirmed_count,
+            my_wp.status as participant_status,
+            my_wp.id as participant_request_id
        from workouts w
        join users u on u.id = w.organizer_id
        left join workout_participants wp on wp.workout_id = w.id
+       left join workout_participants my_wp on my_wp.workout_id = w.id and my_wp.user_id = $2
       where w.id = $1
-      group by w.id, u.full_name`,
-    [id],
+      group by w.id, u.full_name, my_wp.status, my_wp.id`,
+    [id, user.id],
   );
   if (!rows[0]) throw notFound("Тренировка не найдена");
   return json({ workout: workoutPayload(rows[0]) });

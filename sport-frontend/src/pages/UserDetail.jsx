@@ -72,6 +72,12 @@ export function UserDetail({ user, currentAdmin, onBack, onChanged, onDeleted })
         </div>
       </div>
 
+      {error && (
+        <div style={{ marginBottom: 16, color: T.danger, fontSize: 13, fontWeight: 700 }}>
+          {error}
+        </div>
+      )}
+
       <div className="user-detail-grid" style={{ display: "grid", gridTemplateColumns: "1fr 300px", gap: 18 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
           <Card>

@@ -47,8 +47,13 @@ export const api = {
   achievements: id => request(`/api/users/${id}/achievements`),
 
   workouts: params => request(`/api/workouts${toQuery(params)}`),
+  workout: id => request(`/api/workouts/${id}`),
   createWorkout: payload => request("/api/workouts", {
     method: "POST",
+    body: JSON.stringify(payload),
+  }),
+  updateWorkout: (id, payload) => request(`/api/workouts/${id}`, {
+    method: "PATCH",
     body: JSON.stringify(payload),
   }),
   cancelWorkout: (id, reason) => request(`/api/workouts/${id}/cancel`, {
@@ -56,7 +61,16 @@ export const api = {
     body: JSON.stringify({ reason }),
   }),
   joinWorkout: id => request(`/api/workouts/${id}/requests`, { method: "POST" }),
+  workoutRequests: id => request(`/api/workouts/${id}/requests`),
+  respondRequest: (workoutId, requestId, status) => request(`/api/workouts/${workoutId}/requests/${requestId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ status }),
+  }),
   cancelParticipation: id => request(`/api/workouts/${id}/participation`, { method: "DELETE" }),
+  createReview: (workoutId, payload) => request(`/api/workouts/${workoutId}/reviews`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  }),
 
   notifications: () => request("/api/notifications"),
   reports: () => request("/api/reports"),
