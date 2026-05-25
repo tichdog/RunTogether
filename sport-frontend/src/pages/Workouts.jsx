@@ -3,17 +3,19 @@ import { api } from "../api/client";
 import { Avatar, Btn, Card, EmptyState, Input, Select, StatusBadge } from "../components/ui";
 import { T } from "../tokens";
 
-const INITIAL_FORM = {
-  title: "",
-  startAt: "",
-  meetingName: "",
-  meetingAddress: "",
-  routeName: "",
-  distanceKm: 5,
-  paceMinPerKm: 6,
-  difficulty: "easy",
-  participantLimit: 12,
-};
+function initialForm(participantLimit = 20) {
+  return {
+    title: "",
+    startAt: "",
+    meetingName: "",
+    meetingAddress: "",
+    routeName: "",
+    distanceKm: 5,
+    paceMinPerKm: 6,
+    difficulty: "easy",
+    participantLimit,
+  };
+}
 
 export function Workouts({ selectedWorkoutId, onSelectWorkout, onBackToList }) {
   const [workouts, setWorkouts] = useState([]);
@@ -23,7 +25,8 @@ export function Workouts({ selectedWorkoutId, onSelectWorkout, onBackToList }) {
   const [difficulty, setDifficulty] = useState("");
   const [sort, setSort] = useState("time");
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState(INITIAL_FORM);
+  const [form, setForm] = useState(() => initialForm());
+  const [defaultParticipantLimit, setDefaultParticipantLimit] = useState(20);
   const [message, setMessage] = useState("");
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -57,6 +60,22 @@ export function Workouts({ selectedWorkoutId, onSelectWorkout, onBackToList }) {
     load();
   }, [load]);
 
+  const loadDefaultParticipantLimit = useCallback(async () => {
+    try {
+      const data = await api.settings();
+      const limit = Number(data.settings?.default_participant_limit);
+      if (!Number.isFinite(limit)) return;
+      setDefaultParticipantLimit(limit);
+      setForm(prev => ({ ...prev, participantLimit: limit }));
+    } catch {
+      // The form can still be used with the local fallback.
+    }
+  }, []);
+
+  useEffect(() => {
+    loadDefaultParticipantLimit();
+  }, [loadDefaultParticipantLimit]);
+
   useEffect(() => {
     if (!selectedWorkoutId) {
       setSelectedWorkout(null);
@@ -87,7 +106,7 @@ export function Workouts({ selectedWorkoutId, onSelectWorkout, onBackToList }) {
         difficulty: form.difficulty,
         participantLimit: Number(form.participantLimit),
       });
-      setForm(INITIAL_FORM);
+      setForm(initialForm(defaultParticipantLimit));
       setShowForm(false);
       load();
     } catch (err) {
@@ -177,7 +196,13 @@ export function Workouts({ selectedWorkoutId, onSelectWorkout, onBackToList }) {
           <h1 style={{ margin: 0, fontSize: 26, fontWeight: 800, color: T.text }}>Тренировки</h1>
           <p style={{ margin: "4px 0 0", fontSize: 13, color: T.textMuted }}>{filtered.length} записей</p>
         </div>
-        <Btn variant="primary" onClick={() => setShowForm(value => !value)}>
+        <Btn
+          variant="primary"
+          onClick={() => {
+            if (!showForm) loadDefaultParticipantLimit();
+            setShowForm(value => !value);
+          }}
+        >
           {showForm ? "Скрыть форму" : "Создать"}
         </Btn>
       </div>

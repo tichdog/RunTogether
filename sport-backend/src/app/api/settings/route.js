@@ -3,8 +3,7 @@ import { json, readJson, route } from "@/lib/server/response";
 import { getSettings, upsertSettings } from "@/lib/services/settings";
 
 export const GET = route(async request => {
-  const user = await requireAuth(request);
-  requireAdmin(user);
+  await requireAuth(request);
   return json({ settings: await getSettings() });
 });
 

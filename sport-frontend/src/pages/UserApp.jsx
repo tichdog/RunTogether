@@ -81,7 +81,7 @@ function normalizeUserPath(pathname) {
   return path === "/" ? USER_TAB_PATHS.home : path;
 }
 
-function defaultWorkoutForm() {
+function defaultWorkoutForm(participantLimit = 10) {
   const start = new Date(Date.now() + 24 * 60 * 60 * 1000);
   start.setMinutes(0, 0, 0);
 
@@ -96,7 +96,7 @@ function defaultWorkoutForm() {
     distanceKm: 5,
     paceMinPerKm: 6,
     difficulty: "easy",
-    participantLimit: 10,
+    participantLimit,
   };
 }
 
@@ -109,6 +109,7 @@ export function UserApp({ user, onLogout }) {
   const [publicProfile, setPublicProfile] = useState(null);
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [form, setForm] = useState(defaultWorkoutForm);
+  const [defaultParticipantLimit, setDefaultParticipantLimit] = useState(10);
   const [profile, setProfile] = useState(() => profileFromUser(user));
   const [loading, setLoading] = useState(true);
   const [profileLoading, setProfileLoading] = useState(false);
@@ -213,6 +214,24 @@ export function UserApp({ user, onLogout }) {
   }, [mode, screen, selectedWorkout]);
 
   useEffect(() => {
+    if (screen !== "create" || mode !== "create") return;
+
+    let ignore = false;
+    api.settings()
+      .then(data => {
+        const limit = Number(data.settings?.default_participant_limit);
+        if (ignore || !Number.isFinite(limit)) return;
+        setDefaultParticipantLimit(limit);
+        setForm(defaultWorkoutForm(limit));
+      })
+      .catch(() => {});
+
+    return () => {
+      ignore = true;
+    };
+  }, [mode, screen]);
+
+  useEffect(() => {
     if (!selectedId || !["detail", "requests", "create"].includes(routeScreen) || selectedWorkout || loading) return;
 
     let ignore = false;
@@ -313,7 +332,7 @@ export function UserApp({ user, onLogout }) {
     navigate(USER_TAB_PATHS[tab] || USER_TAB_PATHS.home);
     setMessage(null);
     if (tab === "create") {
-      setForm(defaultWorkoutForm());
+      setForm(defaultWorkoutForm(defaultParticipantLimit));
     }
   };
 

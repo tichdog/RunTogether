@@ -651,7 +651,7 @@
   background: #fff;
 }
 
-.rt-user-list-item > span,
+.rt-user-list-item > span:not(.rt-avatar),
 .rt-user-list-item strong,
 .rt-user-list-item em {
   min-width: 0;
