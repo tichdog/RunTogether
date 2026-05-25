@@ -15,5 +15,5 @@ export const POST = route(async request => {
   );
   const { rows } = await query(`${USER_SELECT} where u.id = $1`, [user.id]);
 
-  return json({ user: publicUser(rows[0]) });
+  return json({ user: publicUser(rows[0], { viewer: user }) });
 });

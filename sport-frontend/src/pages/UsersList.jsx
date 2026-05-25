@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../api/client";
 import { Avatar, Badge, Card, EmptyState, Input, Select, StatusBadge } from "../components/ui";
+import { ReportUserButton } from "../components/ReportUserButton";
 import { ROLE_COLORS, ROLE_LABELS, STATUS_LABELS, T } from "../tokens";
 
-export function UsersList({ onSelect }) {
+export function UsersList({ onSelect, currentUserId }) {
   const [users, setUsers] = useState([]);
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("");
@@ -48,7 +49,7 @@ export function UsersList({ onSelect }) {
 
       <Card style={{ padding: 0, overflow: "hidden" }}>
         <div className="users-list-header" style={headerGrid}>
-          {["№", "Пользователь", "Email", "Роль", "Рейтинг", "Статус", "Верификация"].map(h => <div key={h}>{h}</div>)}
+          {["№", "Пользователь", "Email", "Роль", "Рейтинг", "Статус", "Верификация", ""].map(h => <div key={h}>{h}</div>)}
         </div>
 
         {filtered.map((user, i) => (
@@ -63,10 +64,15 @@ export function UsersList({ onSelect }) {
             <span className="user-cell user-cell-rating" style={{ fontSize: 13, color: T.warning, fontWeight: 800 }}>
               {user.stats?.rating ? `★ ${Number(user.stats.rating).toFixed(1)}` : "—"}
             </span>
-            <div className="user-cell user-cell-status"><StatusBadge status={user.status} /></div>
+            <div className="user-cell user-cell-status">
+              <StatusBadge status={user.status} />
+            </div>
             <span className="user-cell user-cell-verified" style={{ fontSize: 12, color: user.phoneVerified ? T.success : T.textHint, fontWeight: 600 }}>
               {STATUS_LABELS[user.verified] || user.verified}
             </span>
+            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+              <ReportUserButton user={user} currentUserId={currentUserId} compact />
+            </div>
           </div>
         ))}
         {!filtered.length && <EmptyState>Пользователи не найдены.</EmptyState>}
@@ -77,7 +83,8 @@ export function UsersList({ onSelect }) {
 
 const headerGrid = {
   display: "grid",
-  gridTemplateColumns: "64px 1fr 1.4fr 120px 86px 110px 140px",
+  gridTemplateColumns: "56px minmax(150px, 1.1fr) minmax(160px, 1.35fr) minmax(126px, 0.75fr) 86px minmax(132px, 0.75fr) minmax(160px, 0.9fr) 90px",
+  gap: 10,
   padding: "10px 18px", fontSize: 11.5, color: T.textHint,
   fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em",
   background: T.surfaceAlt, borderBottom: `1px solid ${T.border}`,
@@ -86,7 +93,8 @@ const headerGrid = {
 function rowGrid(index, total) {
   return {
     display: "grid",
-    gridTemplateColumns: "64px 1fr 1.4fr 120px 86px 110px 140px",
+    gridTemplateColumns: "56px minmax(150px, 1.1fr) minmax(160px, 1.35fr) minmax(126px, 0.75fr) 86px minmax(132px, 0.75fr) minmax(160px, 0.9fr) 90px",
+    gap: 10,
     padding: "11px 18px", alignItems: "center", cursor: "pointer",
     borderBottom: index < total - 1 ? `1px solid ${T.border}` : "none",
   };

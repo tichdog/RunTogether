@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../api/client";
 import { Avatar, Badge, Btn, Card, SectionTitle, StatusBadge } from "../components/ui";
+import { ReportUserButton } from "../components/ReportUserButton";
 import { ROLE_COLORS, ROLE_LABELS, STATUS_LABELS, T } from "../tokens";
 
 export function UserDetail({ user, currentAdmin, onBack, onChanged, onDeleted }) {
@@ -81,6 +82,8 @@ export function UserDetail({ user, currentAdmin, onBack, onChanged, onDeleted })
     ["Посещено", current.stats?.attendedWorkouts || 0, T.success],
     ["Дистанция", `${current.stats?.distance || 0} км`, T.warning],
     ["Рейтинг", current.stats?.rating ? `★ ${Number(current.stats.rating).toFixed(1)}` : "нет", T.text],
+    ["Жалоб", current.stats?.complaints || 0, T.danger],
+    ["Предупреждений", current.moderation?.warnings || 0, T.warning],
   ];
 
   return (
@@ -108,6 +111,9 @@ export function UserDetail({ user, currentAdmin, onBack, onChanged, onDeleted })
                 <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
                   <Badge text={ROLE_LABELS[current.role]} colors={ROLE_COLORS[current.role]} />
                   <StatusBadge status={current.status} />
+                </div>
+                <div style={{ marginTop: 10 }}>
+                  <ReportUserButton user={current} currentUserId={currentAdmin?.id} />
                 </div>
                 <label style={{
                   display: "inline-flex", alignItems: "center", marginTop: 10,
@@ -191,9 +197,18 @@ export function UserDetail({ user, currentAdmin, onBack, onChanged, onDeleted })
           <Card>
             <SectionTitle>Достижения</SectionTitle>
             {achievements.map(item => (
-              <div key={item.id} style={{ padding: "8px 0", borderBottom: `1px solid ${T.border}` }}>
-                <div style={{ fontSize: 13, fontWeight: 800 }}>{item.title}</div>
-                <div style={{ fontSize: 12, color: T.textMuted }}>{item.description}</div>
+              <div key={item.id} style={{ display: "flex", gap: 10, padding: "10px 0", borderBottom: `1px solid ${T.border}` }}>
+                <div style={{
+                  width: 34, height: 34, borderRadius: "50%", background: T.accentLight,
+                  color: T.accent, display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: 11, fontWeight: 800, flexShrink: 0,
+                }}>
+                  {item.icon}
+                </div>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 800 }}>{item.title}</div>
+                  <div style={{ fontSize: 12, color: T.textMuted }}>{item.description}</div>
+                </div>
               </div>
             ))}
             {!achievements.length && <div style={{ color: T.textMuted, fontSize: 13 }}>Пока нет достижений.</div>}

@@ -51,12 +51,12 @@ export const STATUS_LABELS = {
 };
 
 export const STATUS_STYLES = {
-  active: { bg: "#F0FDF4", text: "#15803D", dot: "#16A34A" },
-  blocked: { bg: "#FEF2F2", text: "#DC2626", dot: "#DC2626" },
-  planned: { bg: "#EFF6FF", text: "#1D4ED8", dot: "#2563EB" },
-  open: { bg: "#EFF6FF", text: "#1D4ED8", dot: "#2563EB" },
-  full: { bg: "#FFF7ED", text: "#C2410C", dot: "#EA580C" },
-  in_progress: { bg: "#F0FDF4", text: "#15803D", dot: "#16A34A" },
-  completed: { bg: "#F9FAFB", text: "#6B7280", dot: "#9CA3AF" },
-  cancelled: { bg: "#FEF2F2", text: "#DC2626", dot: "#DC2626" },
+  active: { bg: "#F0FDF4", text: "#15803D", dot: "#16A34A", border: "#BBF7D0" },
+  blocked: { bg: "#FEF2F2", text: "#DC2626", dot: "#DC2626", border: "#FECACA" },
+  planned: { bg: "#EFF6FF", text: "#1D4ED8", dot: "#2563EB", border: "#BFDBFE" },
+  open: { bg: "#ECFDF3", text: "#15803D", dot: "#16A34A", border: "#BBF7D0" },
+  full: { bg: "#FFF7ED", text: "#C2410C", dot: "#EA580C", border: "#FED7AA" },
+  in_progress: { bg: "#F0FDF4", text: "#15803D", dot: "#16A34A", border: "#BBF7D0" },
+  completed: { bg: "#EEF2FF", text: "#395FC0", dot: "#4D7CFE", border: "#C7D2FE" },
+  cancelled: { bg: "#FEF2F2", text: "#DC2626", dot: "#DC2626", border: "#FECACA" },
 };

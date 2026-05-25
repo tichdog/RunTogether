@@ -15,6 +15,28 @@ export function signSession(user) {
   });
 }
 
+export async function refreshExpiredBlock(user) {
+  if (user?.account_status !== "blocked" || !user.blocked_until) {
+    return user;
+  }
+
+  if (new Date(user.blocked_until).getTime() > Date.now()) {
+    return user;
+  }
+
+  const { rows } = await query(
+    `update users
+        set account_status = 'active',
+            blocked_until = null,
+            block_reason = null,
+            updated_at = now()
+      where id = $1
+      returning *`,
+    [user.id],
+  );
+  return rows[0] || user;
+}
+
 function cookieOptions() {
   return {
     httpOnly: true,
@@ -48,15 +70,9 @@ export async function requireAuth(request) {
 
   try {
     const payload = jwt.verify(token, env.jwtSecret);
-    const { rows } = await query(
-      `select id, email, phone, first_name, last_name, gender, full_name, role, account_status, phone_verified, email_verified,
-              verification_status, avatar_url, privacy_settings, created_at
-         from users
-        where id = $1`,
-      [payload.sub],
-    );
+    const { rows } = await query("select * from users where id = $1", [payload.sub]);
 
-    const user = rows[0];
+    const user = await refreshExpiredBlock(rows[0]);
     if (!user || user.account_status === "blocked") {
       throw new HttpError(401, "Сессия недействительна");
     }

@@ -6,7 +6,13 @@ export async function evaluateAchievements(client, userId) {
     `select
        count(distinct wp.workout_id) filter (where wp.status = 'confirmed' and w.status = 'completed') as completed_count,
        coalesce(sum(w.distance_km) filter (where wp.status = 'confirmed' and w.status = 'completed'), 0) as distance_sum,
-       count(distinct wp.workout_id) filter (where wp.status = 'confirmed' and w.status = 'completed' and extract(hour from w.start_at) < 9) as morning_count
+       count(distinct wp.workout_id) filter (where wp.status = 'confirmed' and w.status = 'completed' and extract(hour from w.start_at) < 9) as morning_count,
+       (
+         select count(*)::int
+           from workouts organized
+          where organized.organizer_id = $1
+            and organized.status = 'completed'
+       ) as organized_count
      from workout_participants wp
      join workouts w on w.id = wp.workout_id
      where wp.user_id = $1`,
@@ -21,7 +27,8 @@ export async function evaluateAchievements(client, userId) {
     const matches =
       (condition.type === "completed_workouts" && Number(stats.completed_count) >= Number(condition.value)) ||
       (condition.type === "distance_km" && Number(stats.distance_sum) >= Number(condition.value)) ||
-      (condition.type === "morning_workouts" && Number(stats.morning_count) >= Number(condition.value));
+      (condition.type === "morning_workouts" && Number(stats.morning_count) >= Number(condition.value)) ||
+      (condition.type === "organized_workouts" && Number(stats.organized_count) >= Number(condition.value));
 
     if (!matches) continue;
 
@@ -51,4 +58,14 @@ export async function evaluateAchievements(client, userId) {
   }
 
   return earned;
+}
+
+export async function evaluateAchievementsForAllUsers(client) {
+  const { rows: users } = await client.query(
+    "select id from users where account_status = 'active'",
+  );
+
+  for (const user of users) {
+    await evaluateAchievements(client, user.id);
+  }
 }

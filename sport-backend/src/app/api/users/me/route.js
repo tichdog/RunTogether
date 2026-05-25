@@ -2,6 +2,7 @@ import { requireAuth } from "@/lib/server/auth";
 import { query } from "@/lib/server/db";
 import { badRequest } from "@/lib/server/http-error";
 import { publicUser } from "@/lib/mappers/user";
+import { USER_SELECT } from "@/lib/repositories/users";
 import { json, readJson, route } from "@/lib/server/response";
 
 const NAME_RE = /^\p{L}{2,15}$/u;
@@ -27,7 +28,7 @@ export const PATCH = route(async request => {
   if (!["male", "female"].includes(gender)) throw badRequest("Некорректный пол");
 
   try {
-    const { rows } = await query(
+    await query(
       `update users
           set first_name = $2,
               last_name = $3,
@@ -40,7 +41,8 @@ export const PATCH = route(async request => {
         returning *`,
       [user.id, firstName, lastName, gender, phone, fullName, JSON.stringify(privacy)],
     );
-    return json({ user: publicUser(rows[0]) });
+    const { rows } = await query(`${USER_SELECT} where u.id = $1`, [user.id]);
+    return json({ user: publicUser(rows[0], { viewer: user }) });
   } catch (error) {
     if (error.code === "23505") throw badRequest("Такой телефон уже используется");
     throw error;

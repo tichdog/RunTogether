@@ -47,7 +47,12 @@ export function Auth({ onAuth }) {
   const rules = useMemo(() => passwordRules(form.password), [form.password]);
   const passwordIsStrong = rules.every(rule => rule.ok);
   const passwordsMatch = form.password.length > 0 && form.password === form.passwordConfirm;
+  const normalizedLogin = form.login.trim().toLowerCase();
   const normalizedEmail = form.email.trim().toLowerCase();
+  const loginIsEmailLike = /[A-Za-z@]/.test(normalizedLogin);
+  const loginEmailError = mode === "login" && normalizedLogin && loginIsEmailLike && !EMAIL_RE.test(normalizedLogin)
+    ? "Введите корректный email."
+    : "";
 
   const fieldErrors = useMemo(() => ({
     firstName: form.firstName && !NAME_RE.test(form.firstName.trim())
@@ -120,6 +125,10 @@ export function Auth({ onAuth }) {
       setError("Проверьте поля регистрации и выполните все требования.");
       return;
     }
+    if (mode === "login" && loginEmailError) {
+      setError(loginEmailError);
+      return;
+    }
 
     setLoading(true);
     try {
@@ -177,6 +186,7 @@ export function Auth({ onAuth }) {
             <label>
               <span>Email или телефон</span>
               <input value={form.login} onChange={set("login")} autoComplete="username" required />
+              {loginEmailError && <small className="field-hint error">{loginEmailError}</small>}
             </label>
           ) : (
             <>
@@ -291,7 +301,7 @@ export function Auth({ onAuth }) {
           <button
             className="auth-submit"
             type="submit"
-            disabled={loading || (mode === "register" && !registerIsValid)}
+            disabled={loading || Boolean(loginEmailError) || (mode === "register" && !registerIsValid)}
           >
             {loading ? "Подождите..." : mode === "login" ? "Войти" : "Зарегистрироваться"}
           </button>

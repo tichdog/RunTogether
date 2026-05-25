@@ -27,5 +27,5 @@ export const PATCH = route(async (request, context) => {
     "update users set role = $2, updated_at = now() where id = $1 returning *",
     [id, role],
   );
-  return json({ user: publicUser(rows[0]) });
+  return json({ user: publicUser(rows[0], { viewer: user }) });
 });

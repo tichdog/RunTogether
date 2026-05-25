@@ -47,7 +47,10 @@ export const api = {
     method: "PATCH",
     body: JSON.stringify({ role }),
   }),
-  blockUser: id => request(`/api/users/${id}/block`, { method: "PATCH" }),
+  blockUser: (id, payload = {}) => request(`/api/users/${id}/block`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  }),
   deleteUser: id => request(`/api/users/${id}`, { method: "DELETE" }),
   history: id => request(`/api/users/${id}/history`),
   achievements: id => request(`/api/users/${id}/achievements`),
@@ -73,20 +76,42 @@ export const api = {
     method: "PATCH",
     body: JSON.stringify({ status }),
   }),
-  cancelParticipation: id => request(`/api/workouts/${id}/participation`, { method: "DELETE" }),
+  cancelParticipation: (id, userId) => request(`/api/workouts/${id}/participation`, {
+    method: "DELETE",
+    body: JSON.stringify(userId ? { userId } : {}),
+  }),
   createReview: (workoutId, payload) => request(`/api/workouts/${workoutId}/reviews`, {
     method: "POST",
     body: JSON.stringify(payload),
   }),
 
   notifications: () => request("/api/notifications"),
-  reports: () => request("/api/reports"),
+  readNotification: id => request(`/api/notifications/${id}/read`, { method: "PATCH" }),
+  reports: params => request(`/api/reports${toQuery(params)}`),
+  createReport: payload => request("/api/reports", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  }),
+  moderateReport: (id, payload) => request(`/api/reports/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  }),
   activities: () => request("/api/activities"),
   settings: () => request("/api/settings"),
   saveSettings: payload => request("/api/settings", {
     method: "PATCH",
     body: JSON.stringify(payload),
   }),
+  adminAchievements: () => request("/api/achievements"),
+  createAchievement: payload => request("/api/achievements", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  }),
+  updateAchievement: (id, payload) => request(`/api/achievements/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  }),
+  deleteAchievement: id => request(`/api/achievements/${id}`, { method: "DELETE" }),
 };
 
 function toQuery(params = {}) {

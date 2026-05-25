@@ -27,5 +27,5 @@ export const POST = route(async (request, context) => {
   if (!rowCount) throw badRequest("РђРІР°С‚Р°СЂ РЅРµ СѓРґР°Р»РѕСЃСЊ СЃРѕС…СЂР°РЅРёС‚СЊ");
 
   const { rows } = await query(`${USER_SELECT} where u.id = $1`, [id]);
-  return json({ user: publicUser(rows[0]) });
+  return json({ user: publicUser(rows[0], { viewer: user }) });
 });

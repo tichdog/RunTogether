@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../api/client";
 import { Avatar, Badge, Btn, Card, EmptyState, SectionTitle, StatusBadge } from "../components/ui";
+import { ReportUserButton } from "../components/ReportUserButton";
 import { ROLE_COLORS, ROLE_LABELS, T } from "../tokens";
 
 const STAT_ACCENTS = [T.accent, T.success, T.warning, T.danger];
 
-export function Overview({ setActive, setSelectedUser }) {
+export function Overview({ setActive, setSelectedUser, currentUserId }) {
   const [users, setUsers] = useState([]);
   const [workouts, setWorkouts] = useState([]);
   const [activities, setActivities] = useState([]);
@@ -58,7 +59,7 @@ export function Overview({ setActive, setSelectedUser }) {
 
           {users.slice(0, 5).map(user => (
             <div key={user.id} style={{
-              display: "grid", gridTemplateColumns: "1fr 120px 110px",
+              display: "grid", gridTemplateColumns: "1fr 120px 110px 90px",
               gap: 8, alignItems: "center", padding: "10px 0",
               borderBottom: `1px solid ${T.border}`,
             }}>
@@ -73,6 +74,7 @@ export function Overview({ setActive, setSelectedUser }) {
               </div>
               <Badge text={ROLE_LABELS[user.role]} colors={ROLE_COLORS[user.role]} />
               <StatusBadge status={user.status} />
+              <ReportUserButton user={user} currentUserId={currentUserId} compact />
             </div>
           ))}
           {!users.length && <EmptyState>Пользователей пока нет.</EmptyState>}
