@@ -22,5 +22,5 @@ export const GET = route(async request => {
     [search, role || null, status || null],
   );
 
-  return json({ users: rows.map(publicUser) });
+  return json({ users: rows.map(row => publicUser(row, { viewer: user })) });
 });

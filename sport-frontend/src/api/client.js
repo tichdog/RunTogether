@@ -73,7 +73,10 @@ export const api = {
     method: "PATCH",
     body: JSON.stringify({ status }),
   }),
-  cancelParticipation: id => request(`/api/workouts/${id}/participation`, { method: "DELETE" }),
+  cancelParticipation: (id, userId) => request(`/api/workouts/${id}/participation`, {
+    method: "DELETE",
+    body: JSON.stringify(userId ? { userId } : {}),
+  }),
   createReview: (workoutId, payload) => request(`/api/workouts/${workoutId}/reviews`, {
     method: "POST",
     body: JSON.stringify(payload),

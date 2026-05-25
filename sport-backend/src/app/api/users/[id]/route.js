@@ -6,12 +6,12 @@ import { getUserRole, USER_SELECT } from "@/lib/repositories/users";
 import { json, noContent, route } from "@/lib/server/response";
 
 export const GET = route(async (request, context) => {
-  await requireAuth(request);
+  const user = await requireAuth(request);
   const { id } = await context.params;
 
   const { rows } = await query(`${USER_SELECT} where u.id = $1`, [id]);
   if (!rows[0]) throw notFound("Пользователь не найден");
-  return json({ user: publicUser(rows[0]) });
+  return json({ user: publicUser(rows[0], { viewer: user }) });
 });
 
 export const DELETE = route(async (request, context) => {

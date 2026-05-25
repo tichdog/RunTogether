@@ -13,5 +13,5 @@ export const GET = route(async request => {
       where u.id = $1`,
     [user.id],
   );
-  return json({ user: publicUser(rows[0]) });
+  return json({ user: publicUser(rows[0], { viewer: user }) });
 });

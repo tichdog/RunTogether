@@ -40,7 +40,7 @@ export const PATCH = route(async request => {
         returning *`,
       [user.id, firstName, lastName, gender, phone, fullName, JSON.stringify(privacy)],
     );
-    return json({ user: publicUser(rows[0]) });
+    return json({ user: publicUser(rows[0], { viewer: user }) });
   } catch (error) {
     if (error.code === "23505") throw badRequest("Такой телефон уже используется");
     throw error;

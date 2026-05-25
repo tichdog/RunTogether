@@ -23,5 +23,5 @@ export const PATCH = route(async (request, context) => {
     "update users set account_status = 'blocked', updated_at = now() where id = $1 returning *",
     [id],
   );
-  return json({ user: publicUser(rows[0]) });
+  return json({ user: publicUser(rows[0], { viewer: user }) });
 });

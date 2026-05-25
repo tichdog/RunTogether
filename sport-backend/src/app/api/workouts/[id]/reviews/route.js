@@ -65,7 +65,7 @@ export const GET = route(async (request, context) => {
 
   return json({
     reviewTargets: rows.map(row => ({
-      user: publicUser(row),
+      user: publicUser(row, { viewer: user }),
       isOrganizer: Boolean(row.is_organizer),
       review: row.my_review_id
         ? { id: row.my_review_id, rating: Number(row.my_review_rating), text: row.my_review_text }

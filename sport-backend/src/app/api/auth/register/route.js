@@ -67,7 +67,7 @@ export const POST = route(async request => {
       [email, phone, passwordHash, firstName, lastName, gender, fullName],
     );
 
-    const response = json({ user: publicUser(rows[0]) }, 201);
+    const response = json({ user: publicUser(rows[0], { viewer: rows[0] }) }, 201);
     setSessionCookie(response, signSession(rows[0]));
     return response;
   } catch (error) {

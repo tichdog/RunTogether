@@ -30,20 +30,27 @@ function adminUserIdFromPath(pathname) {
   return match?.[1] || null;
 }
 
+function adminWorkoutIdFromPath(pathname) {
+  const match = normalizePath(pathname).match(/^\/admin\/workouts\/(\d+)$/);
+  return match?.[1] || null;
+}
+
 function adminPageFromPath(pathname) {
   if (adminUserIdFromPath(pathname)) return "Пользователи";
+  if (adminWorkoutIdFromPath(pathname)) return "Тренировки";
   return ADMIN_PAGE_BY_PATH[normalizePath(pathname)] || "Обзор";
 }
 
 function isKnownAdminPath(pathname) {
   const path = normalizePath(pathname);
-  return Boolean(ADMIN_PAGE_BY_PATH[path] || adminUserIdFromPath(path));
+  return Boolean(ADMIN_PAGE_BY_PATH[path] || adminUserIdFromPath(path) || adminWorkoutIdFromPath(path));
 }
 
 export default function App() {
   const [active, setActive] = useState(() => adminPageFromPath(window.location.pathname));
   const [selectedUser, setSelectedUser] = useState(null);
   const [selectedUserId, setSelectedUserId] = useState(() => adminUserIdFromPath(window.location.pathname));
+  const [selectedWorkoutId, setSelectedWorkoutId] = useState(() => adminWorkoutIdFromPath(window.location.pathname));
   const [selectedUserLoading, setSelectedUserLoading] = useState(false);
   const [user, setUser] = useState(null);
   const [booting, setBooting] = useState(true);
@@ -59,12 +66,17 @@ export default function App() {
     const handlePopState = () => {
       const page = adminPageFromPath(window.location.pathname);
       const userId = adminUserIdFromPath(window.location.pathname);
+      const workoutId = adminWorkoutIdFromPath(window.location.pathname);
       setActive(page);
       setSelectedUserId(userId);
+      setSelectedWorkoutId(workoutId);
       if (!userId) setSelectedUser(null);
       if (page !== "Пользователи") {
         setSelectedUser(null);
         setSelectedUserId(null);
+      }
+      if (page !== "Тренировки") {
+        setSelectedWorkoutId(null);
       }
     };
 
@@ -111,6 +123,7 @@ export default function App() {
     window.history[replace ? "replaceState" : "pushState"]({}, "", ADMIN_PATH_BY_PAGE[page] || "/admin");
     setSelectedUser(null);
     setSelectedUserId(null);
+    setSelectedWorkoutId(null);
   };
 
   const openAdminUser = (nextUser) => {
@@ -124,6 +137,17 @@ export default function App() {
     setSelectedUser(null);
     setSelectedUserId(null);
     window.history.pushState({}, "", ADMIN_PATH_BY_PAGE["Пользователи"]);
+  };
+
+  const openAdminWorkout = (workoutId) => {
+    setActive("Тренировки");
+    setSelectedWorkoutId(String(workoutId));
+    window.history.pushState({}, "", `/admin/workouts/${workoutId}`);
+  };
+
+  const openAdminWorkoutsList = () => {
+    setSelectedWorkoutId(null);
+    window.history.pushState({}, "", ADMIN_PATH_BY_PAGE["Тренировки"]);
   };
 
   const handleAdminUserChanged = (nextUser) => {
@@ -174,7 +198,13 @@ export default function App() {
             onDeleted={openAdminUsersList}
           />
         )}
-        {active === "Тренировки" && <Workouts />}
+        {active === "Тренировки" && (
+          <Workouts
+            selectedWorkoutId={selectedWorkoutId}
+            onSelectWorkout={openAdminWorkout}
+            onBackToList={openAdminWorkoutsList}
+          />
+        )}
         {active === "Настройки" && <Settings />}
       </main>
     </div>

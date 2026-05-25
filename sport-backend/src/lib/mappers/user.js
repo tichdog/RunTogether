@@ -1,5 +1,15 @@
-export function publicUser(row) {
+const ADMIN_ROLES = new Set(["admin", "super_admin"]);
+
+function canViewPrivateContacts(row, viewer) {
+  if (!viewer) return false;
+  return ADMIN_ROLES.has(viewer.role) || Number(row.id) === Number(viewer.id);
+}
+
+export function publicUser(row, { viewer } = {}) {
   if (!row) return null;
+  const hideEmail = Boolean(row.hide_email ?? row.privacy_settings?.hide_email);
+  const hidePhone = Boolean(row.hide_phone ?? row.privacy_settings?.hide_phone);
+  const revealPrivateContacts = canViewPrivateContacts(row, viewer);
   const initials = (row.full_name || row.email || "U")
     .split(" ")
     .filter(Boolean)
@@ -9,8 +19,8 @@ export function publicUser(row) {
 
   return {
     id: row.id,
-    email: row.hide_email ? null : row.email,
-    phone: row.hide_phone ? null : row.phone,
+    email: hideEmail && !revealPrivateContacts ? null : row.email,
+    phone: hidePhone && !revealPrivateContacts ? null : row.phone,
     name: row.full_name,
     firstName: row.first_name,
     lastName: row.last_name,

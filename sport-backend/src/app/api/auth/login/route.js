@@ -23,7 +23,7 @@ export const POST = route(async request => {
     throw new HttpError(403, "Пользователь заблокирован");
   }
 
-  const response = json({ user: publicUser(user) });
+  const response = json({ user: publicUser(user, { viewer: user }) });
   setSessionCookie(response, signSession(user));
   return response;
 });
