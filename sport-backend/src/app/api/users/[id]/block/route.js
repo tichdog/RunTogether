@@ -3,12 +3,23 @@ import { query } from "@/lib/server/db";
 import { badRequest, forbidden, notFound } from "@/lib/server/http-error";
 import { publicUser } from "@/lib/mappers/user";
 import { getUserRole } from "@/lib/repositories/users";
-import { json, route } from "@/lib/server/response";
+import { json, readJson, route } from "@/lib/server/response";
+
+function banUntilFromBody(body) {
+  const mode = String(body.banMode || body.duration || "permanent");
+  if (mode === "permanent") return null;
+  const days = Number(body.banDays || body.days);
+  if (!Number.isFinite(days) || days <= 0) {
+    throw badRequest("Укажите срок бана в днях");
+  }
+  return new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+}
 
 export const PATCH = route(async (request, context) => {
   const user = await requireAuth(request);
   requireAdmin(user);
   const { id } = await context.params;
+  const body = await readJson(request);
   const target = await getUserRole(id);
 
   if (!target) throw notFound("Пользователь не найден");
@@ -19,9 +30,17 @@ export const PATCH = route(async (request, context) => {
     throw forbidden("Блокировать админов может только супер-админ");
   }
 
+  const banUntil = banUntilFromBody(body);
+  const reason = String(body.reason || "Блокировка администратором").trim();
   const { rows } = await query(
-    "update users set account_status = 'blocked', updated_at = now() where id = $1 returning *",
-    [id],
+    `update users
+        set account_status = 'blocked',
+            blocked_until = $2,
+            block_reason = $3,
+            updated_at = now()
+      where id = $1
+      returning *`,
+    [id, banUntil, reason],
   );
   return json({ user: publicUser(rows[0], { viewer: user }) });
 });

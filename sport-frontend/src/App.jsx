@@ -6,6 +6,8 @@ import { UsersList } from "./pages/UsersList";
 import { UserDetail } from "./pages/UserDetail";
 import { Workouts } from "./pages/Workouts";
 import { Settings } from "./pages/Settings";
+import { Achievements } from "./pages/Achievements";
+import { Reports } from "./pages/Reports";
 import { Auth } from "./pages/Auth";
 import { UserApp } from "./pages/UserApp";
 import { T } from "./tokens";
@@ -14,6 +16,8 @@ const ADMIN_PATH_BY_PAGE = {
   "Обзор": "/admin",
   "Пользователи": "/admin/users",
   "Тренировки": "/admin/workouts",
+  "Жалобы": "/admin/reports",
+  "Достижения": "/admin/achievements",
   "Настройки": "/admin/settings",
 };
 
@@ -184,11 +188,11 @@ export default function App() {
       <Sidebar active={active} setActive={handleSetActive} user={user} onLogout={logout} />
 
       <main className="app-main" style={{ flex: 1, display: "flex", flexDirection: "column", overflowY: "auto", background: T.bg }}>
-        {active === "Обзор" && <Overview setActive={handleSetActive} setSelectedUser={openAdminUser} />}
+        {active === "Обзор" && <Overview setActive={handleSetActive} setSelectedUser={openAdminUser} currentUserId={user.id} />}
         {active === "Пользователи" && selectedUserLoading && !selectedUser && (
           <div style={{ padding: 32, fontFamily: "Inter, Segoe UI, sans-serif" }}>Загрузка пользователя...</div>
         )}
-        {active === "Пользователи" && !selectedUser && !selectedUserLoading && <UsersList onSelect={openAdminUser} />}
+        {active === "Пользователи" && !selectedUser && !selectedUserLoading && <UsersList onSelect={openAdminUser} currentUserId={user.id} />}
         {active === "Пользователи" && selectedUser && (
           <UserDetail
             user={selectedUser}
@@ -203,8 +207,11 @@ export default function App() {
             selectedWorkoutId={selectedWorkoutId}
             onSelectWorkout={openAdminWorkout}
             onBackToList={openAdminWorkoutsList}
+            currentUserId={user.id}
           />
         )}
+        {active === "Жалобы" && <Reports onSelectUser={openAdminUser} />}
+        {active === "Достижения" && <Achievements />}
         {active === "Настройки" && <Settings />}
       </main>
     </div>

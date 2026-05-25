@@ -29,11 +29,17 @@ export function publicUser(row, { viewer } = {}) {
     avatarUrl: row.avatar_url,
     role: row.role,
     status: row.account_status,
+    moderation: {
+      warnings: Number(row.warning_count || 0),
+      blockedUntil: row.blocked_until,
+      blockReason: row.block_reason,
+    },
     verified: row.verification_status,
     phoneVerified: row.phone_verified,
     emailVerified: row.email_verified,
     privacy: row.privacy_settings || {},
     registered: row.created_at,
+    achievements: Array.isArray(row.achievements) ? row.achievements : [],
     stats: {
       organizedWorkouts: Number(row.organized_workouts || 0),
       attendedWorkouts: Number(row.attended_workouts || 0),

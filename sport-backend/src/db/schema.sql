@@ -10,6 +10,9 @@ create table if not exists users (
   avatar_url text,
   role text not null default 'member' check (role in ('member', 'admin', 'super_admin')),
   account_status text not null default 'active' check (account_status in ('active', 'blocked')),
+  warning_count integer not null default 0,
+  blocked_until timestamptz,
+  block_reason text,
   phone_verified boolean not null default false,
   email_verified boolean not null default false,
   verification_status text not null default 'unverified' check (verification_status in ('unverified', 'phone_verified', 'fully_verified')),
@@ -22,6 +25,9 @@ create table if not exists users (
 alter table users add column if not exists first_name text;
 alter table users add column if not exists last_name text;
 alter table users add column if not exists gender text;
+alter table users add column if not exists warning_count integer not null default 0;
+alter table users add column if not exists blocked_until timestamptz;
+alter table users add column if not exists block_reason text;
 alter table users drop constraint if exists users_role_check;
 alter table users add constraint users_role_check check (role in ('member', 'admin', 'super_admin'));
 
@@ -112,10 +118,31 @@ create table if not exists reports (
   reported_user_id bigint not null references users(id) on delete cascade,
   reason text not null,
   details text,
-  status text not null default 'open' check (status in ('open', 'reviewed', 'dismissed')),
+  status text not null default 'open' check (status in ('open', 'reviewed', 'warned', 'banned', 'dismissed')),
+  resolution_action text,
+  moderator_comment text,
+  ban_until timestamptz,
   moderator_id bigint references users(id),
   created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
   resolved_at timestamptz
+);
+
+alter table reports drop constraint if exists reports_status_check;
+alter table reports add constraint reports_status_check check (status in ('open', 'reviewed', 'warned', 'banned', 'dismissed'));
+alter table reports add column if not exists resolution_action text;
+alter table reports add column if not exists moderator_comment text;
+alter table reports add column if not exists ban_until timestamptz;
+alter table reports add column if not exists updated_at timestamptz not null default now();
+
+create table if not exists user_warnings (
+  id bigserial primary key,
+  user_id bigint not null references users(id) on delete cascade,
+  moderator_id bigint references users(id) on delete set null,
+  report_id bigint references reports(id) on delete set null,
+  reason text not null,
+  comment text,
+  created_at timestamptz not null default now()
 );
 
 create table if not exists activity_feed (

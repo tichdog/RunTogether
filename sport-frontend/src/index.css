@@ -80,6 +80,31 @@ img {
   transition: background 0.2s ease;
 }
 
+.users-list-header > *,
+.user-row > .user-cell {
+  min-width: 0;
+}
+
+.users-list-header > * {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.user-cell-user,
+.user-cell-email,
+.user-cell-verified {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.user-cell-status {
+  display: flex;
+  justify-content: flex-start;
+}
+
 .user-row:hover {
   background: rgba(0, 0, 0, 0.03);
 }
@@ -99,7 +124,7 @@ img {
   }
 }
 
-@media (max-width: 740px) {
+@media (max-width: 1040px) {
   .users-filter-row {
     flex-direction: column;
   }
@@ -109,22 +134,44 @@ img {
   }
 
   .user-row {
-    display: block !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px 14px;
     padding: 16px !important;
     border-bottom: 1px solid #e6e4de !important;
   }
 
   .user-row > * {
-    display: block !important;
-    width: 100% !important;
-    margin-bottom: 10px !important;
+    width: auto !important;
+    margin-bottom: 0 !important;
   }
 
   .user-row > .user-cell.user-cell-user {
+    grid-column: 1 / -1;
     display: flex !important;
     align-items: center !important;
     gap: 10px !important;
-    margin-bottom: 10px !important;
+  }
+
+  .user-row > .user-cell.user-cell-id,
+  .user-row > .user-cell.user-cell-email {
+    grid-column: 1 / -1;
+  }
+
+  .user-row > .user-cell.user-cell-id::before {
+    content: "ID: ";
+  }
+
+  .user-row > .user-cell.user-cell-email::before {
+    content: "Email: ";
+    color: #9e9b93;
+    font-weight: 700;
+  }
+
+  .user-row > .user-cell.user-cell-rating::before {
+    content: "Рейтинг: ";
+    color: #9e9b93;
+    font-weight: 700;
   }
 
   .user-row > .user-cell.user-cell-role,
@@ -135,7 +182,14 @@ img {
   }
 
   .user-row > .user-cell.user-cell-verified {
-    margin-bottom: 0 !important;
+    grid-column: 1 / -1;
+    white-space: normal;
+  }
+
+  .user-row > .user-cell.user-cell-verified::before {
+    content: "Верификация: ";
+    color: #9e9b93;
+    font-weight: 700;
   }
 }
 

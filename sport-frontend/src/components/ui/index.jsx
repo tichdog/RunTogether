@@ -33,11 +33,13 @@ export function StatusBadge({ status }) {
   const s = STATUS_STYLES[status] || { bg: "#F3F4F6", text: "#374151", dot: "#9CA3AF" };
   return (
     <span style={{
-      background: s.bg, color: s.text, borderRadius: T.radiusSm,
-      padding: "3px 9px", fontSize: 12, fontWeight: 600,
-      display: "inline-flex", alignItems: "center", gap: 5,
+      minWidth: 118, height: 30, background: s.bg, color: s.text,
+      border: `1px solid ${s.border || s.dot || T.border}`,
+      borderRadius: 999, padding: "0 12px", fontSize: 12, fontWeight: 800,
+      display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 7,
+      lineHeight: 1, whiteSpace: "nowrap", flexShrink: 0,
     }}>
-      <span style={{ width: 6, height: 6, borderRadius: "50%", background: s.dot, flexShrink: 0 }} />
+      <span style={{ width: 7, height: 7, borderRadius: "50%", background: s.dot, flexShrink: 0 }} />
       {STATUS_LABELS[status] || status}
     </span>
   );
@@ -68,7 +70,7 @@ export function Btn({ children, onClick, variant = "default", danger, type = "bu
   );
 }
 
-export function Input({ value, onChange, placeholder, type = "text", style: extra, required }) {
+export function Input({ value, onChange, placeholder, type = "text", style: extra, required, disabled }) {
   return (
     <input
       type={type}
@@ -76,11 +78,12 @@ export function Input({ value, onChange, placeholder, type = "text", style: extr
       onChange={onChange}
       placeholder={placeholder}
       required={required}
+      disabled={disabled}
       style={{
         background: T.surface, border: `1px solid ${T.border}`,
         borderRadius: T.radiusSm, padding: "9px 12px", fontSize: 13,
         color: T.text, outline: "none", fontFamily: "inherit",
-        minWidth: 0, ...extra,
+        minWidth: 0, opacity: disabled ? 0.55 : 1, ...extra,
       }}
     />
   );

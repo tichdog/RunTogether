@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "../api/client";
+import { ReportUserButton } from "../components/ReportUserButton";
 import "../styles/user-app.css";
 
 const EMPTY_FILTERS = {
@@ -17,6 +18,7 @@ const USER_TAB_PATHS = {
   organized: "/organized",
   participating: "/participating",
   create: "/workouts/new",
+  notifications: "/notifications",
   profile: "/profile",
 };
 
@@ -69,6 +71,10 @@ function routeFromPath(pathname) {
     return { path, activeTab: "create", screen: "create", selectedId: null, mode: "create" };
   }
 
+  if (path === USER_TAB_PATHS.notifications) {
+    return { path, activeTab: "notifications", screen: "notifications", selectedId: null, mode: "create" };
+  }
+
   if (path === USER_TAB_PATHS.profile) {
     return { path, activeTab: "profile", screen: "profile", selectedId: null, mode: "create" };
   }
@@ -106,6 +112,7 @@ export function UserApp({ user, onLogout }) {
   const [workouts, setWorkouts] = useState([]);
   const [requests, setRequests] = useState([]);
   const [reviewTargets, setReviewTargets] = useState([]);
+  const [notifications, setNotifications] = useState([]);
   const [publicProfile, setPublicProfile] = useState(null);
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [form, setForm] = useState(defaultWorkoutForm);
@@ -121,6 +128,16 @@ export function UserApp({ user, onLogout }) {
     const nextRoute = routeFromPath(path);
     setRoute(nextRoute);
     window.history[replace ? "replaceState" : "pushState"]({}, "", nextRoute.path);
+  }, []);
+
+  const refreshCurrentUser = useCallback(async ({ syncProfileForm = false } = {}) => {
+    const data = await api.me();
+    if (!data.user) return null;
+    setCurrentUser(data.user);
+    if (syncProfileForm) {
+      setProfile(profileFromUser(data.user));
+    }
+    return data.user;
   }, []);
 
   const selectedWorkout = useMemo(
@@ -166,6 +183,25 @@ export function UserApp({ user, onLogout }) {
     });
   }, [filters, workouts]);
 
+  const moderationNotifications = useMemo(
+    () => notifications.filter(item => ["moderation_warning", "moderation_ban"].includes(item.type)),
+    [notifications],
+  );
+
+  const unreadNotifications = useMemo(
+    () => notifications.filter(item => !item.read_at).length,
+    [notifications],
+  );
+
+  const loadNotifications = useCallback(async () => {
+    try {
+      const data = await api.notifications();
+      setNotifications(data.notifications || []);
+    } catch {
+      setNotifications([]);
+    }
+  }, []);
+
   const loadWorkouts = useCallback(async () => {
     setLoading(true);
     setMessage(null);
@@ -175,16 +211,22 @@ export function UserApp({ user, onLogout }) {
         sort: filters.sort,
       });
       setWorkouts(data.workouts || []);
+      refreshCurrentUser().catch(() => {});
+      loadNotifications();
     } catch (error) {
       setMessage({ type: "error", text: error.message });
     } finally {
       setLoading(false);
     }
-  }, [filters.difficulty, filters.sort]);
+  }, [filters.difficulty, filters.sort, loadNotifications, refreshCurrentUser]);
 
   useEffect(() => {
     loadWorkouts();
   }, [loadWorkouts]);
+
+  useEffect(() => {
+    loadNotifications();
+  }, [loadNotifications]);
 
   useEffect(() => {
     if (window.location.pathname !== route.path) {
@@ -206,6 +248,36 @@ export function UserApp({ user, onLogout }) {
     setCurrentUser(user);
     setProfile(profileFromUser(user));
   }, [user]);
+
+  useEffect(() => {
+    if (screen !== "profile") return;
+    refreshCurrentUser({ syncProfileForm: true }).catch(() => {});
+  }, [refreshCurrentUser, screen]);
+
+  useEffect(() => {
+    const refreshOnFocus = () => {
+      refreshCurrentUser().catch(() => {});
+    };
+    const refreshOnVisible = () => {
+      if (document.visibilityState === "visible") refreshOnFocus();
+    };
+
+    window.addEventListener("focus", refreshOnFocus);
+    document.addEventListener("visibilitychange", refreshOnVisible);
+    return () => {
+      window.removeEventListener("focus", refreshOnFocus);
+      document.removeEventListener("visibilitychange", refreshOnVisible);
+    };
+  }, [refreshCurrentUser]);
+
+  useEffect(() => {
+    if (screen !== "profile") return;
+    const timer = window.setInterval(() => {
+      refreshCurrentUser().catch(() => {});
+    }, 30000);
+
+    return () => window.clearInterval(timer);
+  }, [refreshCurrentUser, screen]);
 
   useEffect(() => {
     if (screen === "create" && mode === "edit" && selectedWorkout) {
@@ -424,6 +496,16 @@ export function UserApp({ user, onLogout }) {
     navigate(`/users/${userId}`);
   };
 
+  const markNotificationRead = async (notificationId) => {
+    try {
+      const data = await api.readNotification(notificationId);
+      if (!data.notification) return;
+      setNotifications(prev => prev.map(item => Number(item.id) === Number(notificationId) ? data.notification : item));
+    } catch (error) {
+      setMessage({ type: "error", text: error.message });
+    }
+  };
+
   const respondToRequest = async (requestId, status) => {
     if (!selectedWorkout) return;
     setSaving(true);
@@ -515,7 +597,7 @@ export function UserApp({ user, onLogout }) {
           <span>R</span>
           <strong>RunTogether</strong>
         </div>
-        <NavItems active={activeTab} onChange={goTab} />
+        <NavItems active={activeTab} onChange={goTab} unreadCount={unreadNotifications} />
         <div className="rt-sidebar-user">
           <Avatar user={currentUser} />
           <div>
@@ -537,9 +619,11 @@ export function UserApp({ user, onLogout }) {
             user={currentUser}
             workouts={visibleWorkouts}
             organizedWorkouts={organizedWorkouts}
+            participatingWorkouts={participatingWorkouts}
             loading={loading}
             onOpen={openWorkout}
             onCreate={() => goTab("create")}
+            onNavigate={goTab}
           />
         )}
 
@@ -585,6 +669,7 @@ export function UserApp({ user, onLogout }) {
             onJoin={joinWorkout}
             onLeave={leaveWorkout}
             onReview={saveReview}
+            currentUserId={currentUser.id}
             onBack={() => navigate(activeTab === "participating" ? USER_TAB_PATHS.participating : USER_TAB_PATHS.workouts)}
           />
         )}
@@ -609,6 +694,7 @@ export function UserApp({ user, onLogout }) {
             onCancel={cancelWorkout}
             onRequests={openRequests}
             onReview={saveReview}
+            currentUserId={currentUser.id}
             onBack={() => navigate(activeTab === "organized" ? USER_TAB_PATHS.organized : USER_TAB_PATHS.workouts)}
           />
         )}
@@ -620,6 +706,7 @@ export function UserApp({ user, onLogout }) {
             saving={saving}
             onBack={() => navigate(`/workouts/${selectedWorkout.id}`)}
             onRespond={respondToRequest}
+            currentUserId={currentUser.id}
           />
         )}
 
@@ -628,6 +715,7 @@ export function UserApp({ user, onLogout }) {
             user={currentUser}
             profile={profile}
             setProfile={setProfile}
+            moderationNotifications={moderationNotifications}
             saving={saving}
             onSubmit={saveProfile}
             onAvatarChange={saveAvatar}
@@ -635,27 +723,36 @@ export function UserApp({ user, onLogout }) {
           />
         )}
 
+        {screen === "notifications" && (
+          <NotificationsScreen
+            notifications={notifications}
+            onRead={markNotificationRead}
+          />
+        )}
+
         {screen === "userProfile" && (
           <PublicProfileScreen
             user={publicProfile}
             loading={profileLoading}
+            currentUserId={currentUser.id}
             onBack={() => navigate(USER_TAB_PATHS.workouts)}
           />
         )}
       </main>
 
       <nav className="rt-bottom-nav" aria-label="Основная навигация">
-        <NavItems active={activeTab} onChange={goTab} compact />
+        <NavItems active={activeTab} onChange={goTab} compact unreadCount={unreadNotifications} />
       </nav>
     </div>
   );
 }
 
-function HomeScreen({ user, workouts, organizedWorkouts, loading, onOpen, onCreate }) {
+function HomeScreen({ user, workouts, organizedWorkouts, participatingWorkouts, loading, onOpen, onCreate, onNavigate }) {
   const nextWorkouts = workouts
     .filter(workout => Number(workout.organizerId) !== Number(user.id) && isJoinableStatus(workout.status))
     .slice(0, 3);
   const nextOrganizerWorkout = organizedWorkouts.find(workout => !["completed", "cancelled"].includes(workout.status));
+  const pendingParticipations = participatingWorkouts.filter(workout => workout.participantStatus === "pending").length;
 
   return (
     <section className="rt-page">
@@ -671,6 +768,23 @@ function HomeScreen({ user, workouts, organizedWorkouts, loading, onOpen, onCrea
       </div>
 
       <StatsGrid stats={user.stats} />
+
+      <div className="rt-mobile-quick-actions" aria-label="Быстрые переходы">
+        <button type="button" onClick={() => onNavigate("organized")}>
+          <Icon name="clipboard" />
+          <span>
+            <strong>Организую</strong>
+            <em>{organizedWorkouts.length} тренировок</em>
+          </span>
+        </button>
+        <button type="button" onClick={() => onNavigate("participating")}>
+          <Icon name="check" />
+          <span>
+            <strong>Участвую</strong>
+            <em>{pendingParticipations ? `${pendingParticipations} на рассмотрении` : `${participatingWorkouts.length} заявок`}</em>
+          </span>
+        </button>
+      </div>
 
       <div className="rt-columns">
         <section>
@@ -770,7 +884,7 @@ function ParticipatingWorkoutsScreen({ workouts, loading, saving, onOpen, onLeav
   );
 }
 
-function WorkoutDetail({ workout, reviewTargets, saving, onOpenUser, onJoin, onLeave, onReview, onBack }) {
+function WorkoutDetail({ workout, reviewTargets, saving, onOpenUser, onJoin, onLeave, onReview, currentUserId, onBack }) {
   const canJoin = isJoinableStatus(workout.status) && !["pending", "confirmed"].includes(workout.participantStatus);
   const canLeave = ["pending", "confirmed"].includes(workout.participantStatus);
 
@@ -784,7 +898,7 @@ function WorkoutDetail({ workout, reviewTargets, saving, onOpenUser, onJoin, onL
       <div className="rt-detail-grid">
         <div className="rt-side-stack">
           <InfoPanel workout={workout} />
-          <ParticipantsPanel workout={workout} onOpenUser={onOpenUser} />
+          <ParticipantsPanel workout={workout} onOpenUser={onOpenUser} currentUserId={currentUserId} />
         </div>
         <div className="rt-side-stack">
           <div className="rt-panel">
@@ -806,7 +920,7 @@ function WorkoutDetail({ workout, reviewTargets, saving, onOpenUser, onJoin, onL
             </div>
           </div>
           {workout.status === "completed" && (
-            <ReviewPanel targets={reviewTargets} saving={saving} onReview={onReview} />
+            <ReviewPanel targets={reviewTargets} saving={saving} onReview={onReview} currentUserId={currentUserId} />
           )}
         </div>
       </div>
@@ -814,7 +928,7 @@ function WorkoutDetail({ workout, reviewTargets, saving, onOpenUser, onJoin, onL
   );
 }
 
-function OrganizerScreen({ workout, reviewTargets, saving, onOpenUser, onEdit, onCancel, onRequests, onReview, onBack }) {
+function OrganizerScreen({ workout, reviewTargets, saving, onOpenUser, onEdit, onCancel, onRequests, onReview, currentUserId, onBack }) {
   return (
     <section className="rt-page">
       <button className="rt-link-button" type="button" onClick={onBack}>
@@ -825,7 +939,7 @@ function OrganizerScreen({ workout, reviewTargets, saving, onOpenUser, onEdit, o
       <div className="rt-detail-grid">
         <div className="rt-side-stack">
           <InfoPanel workout={workout} />
-          <ParticipantsPanel workout={workout} onOpenUser={onOpenUser} />
+          <ParticipantsPanel workout={workout} onOpenUser={onOpenUser} currentUserId={currentUserId} />
         </div>
         <div className="rt-side-stack">
           <div className="rt-panel">
@@ -845,7 +959,7 @@ function OrganizerScreen({ workout, reviewTargets, saving, onOpenUser, onEdit, o
             </div>
           </div>
           {workout.status === "completed" && (
-            <ReviewPanel targets={reviewTargets} saving={saving} onReview={onReview} />
+            <ReviewPanel targets={reviewTargets} saving={saving} onReview={onReview} currentUserId={currentUserId} />
           )}
         </div>
       </div>
@@ -853,7 +967,7 @@ function OrganizerScreen({ workout, reviewTargets, saving, onOpenUser, onEdit, o
   );
 }
 
-function RequestsScreen({ workout, requests, saving, onBack, onRespond }) {
+function RequestsScreen({ workout, requests, saving, onBack, onRespond, currentUserId }) {
   return (
     <section className="rt-page">
       <button className="rt-link-button" type="button" onClick={onBack}>
@@ -870,12 +984,19 @@ function RequestsScreen({ workout, requests, saving, onBack, onRespond }) {
               <span>{request.email}</span>
               <em>{participantLabel(request.status)}</em>
             </div>
-            {request.status === "pending" && (
-              <div className="rt-request-actions">
+            <div className="rt-request-actions">
+              <ReportUserButton
+                user={{ id: request.user_id, name: request.full_name || request.email }}
+                currentUserId={currentUserId}
+                compact
+              />
+              {request.status === "pending" && (
+                <>
                 <button type="button" disabled={saving} onClick={() => onRespond(request.id, "confirmed")}>Принять</button>
                 <button type="button" disabled={saving} onClick={() => onRespond(request.id, "declined")}>Отклонить</button>
-              </div>
-            )}
+                </>
+              )}
+            </div>
           </article>
         ))}
         {!requests.length && <EmptyState title="Заявок пока нет" text="Когда участники отправят заявки, они появятся здесь." />}
@@ -884,7 +1005,7 @@ function RequestsScreen({ workout, requests, saving, onBack, onRespond }) {
   );
 }
 
-function PublicProfileScreen({ user, loading, onBack }) {
+function PublicProfileScreen({ user, loading, currentUserId, onBack }) {
   if (loading) {
     return (
       <section className="rt-page">
@@ -921,14 +1042,16 @@ function PublicProfileScreen({ user, loading, onBack }) {
           <span>{roleLabel(user.role)}</span>
           <h1>{user.name}</h1>
           <p>{user.email || "Email скрыт"}{user.phone ? ` · ${user.phone}` : ""}</p>
+          <ReportUserButton user={user} currentUserId={currentUserId} />
         </div>
       </div>
       <StatsGrid stats={user.stats} />
+      <AchievementsPanel achievements={user.achievements} />
     </section>
   );
 }
 
-function ParticipantsPanel({ workout, onOpenUser }) {
+function ParticipantsPanel({ workout, onOpenUser, currentUserId }) {
   const organizer = workout.organizer || {
     id: workout.organizerId,
     name: workout.organizerName,
@@ -941,13 +1064,14 @@ function ParticipantsPanel({ workout, onOpenUser }) {
     <div className="rt-panel">
       <SectionHead title="Участники" caption={`${participants.length} подтверждено`} />
       <div className="rt-participant-list">
-        <UserListItem user={organizer} label="Организатор" onOpen={() => onOpenUser(organizer.id)} />
+        <UserListItem user={organizer} label="Организатор" onOpen={() => onOpenUser(organizer.id)} currentUserId={currentUserId} />
         {participants.map(participant => (
           <UserListItem
             key={participant.id}
             user={participant}
             label="Участник"
             onOpen={() => onOpenUser(participant.id)}
+            currentUserId={currentUserId}
           />
         ))}
       </div>
@@ -958,20 +1082,30 @@ function ParticipantsPanel({ workout, onOpenUser }) {
   );
 }
 
-function UserListItem({ user, label, onOpen }) {
+function UserListItem({ user, label, onOpen, currentUserId }) {
   return (
-    <button className="rt-user-list-item" type="button" onClick={onOpen}>
+    <div
+      className="rt-user-list-item"
+      role="button"
+      tabIndex={0}
+      onClick={onOpen}
+      onKeyDown={event => {
+        if (event.key === "Enter" || event.key === " ") onOpen();
+      }}
+      style={{ gridTemplateColumns: "38px minmax(0, 1fr) auto 22px" }}
+    >
       <Avatar user={user} />
       <span>
         <strong>{user.name}</strong>
         <em>{label} · рейтинг {formatRating(user.stats?.rating)}</em>
       </span>
+      <ReportUserButton user={user} currentUserId={currentUserId} compact />
       <Icon name="arrowRight" />
-    </button>
+    </div>
   );
 }
 
-function ReviewPanel({ targets = [], saving, onReview }) {
+function ReviewPanel({ targets = [], saving, onReview, currentUserId }) {
   const ratedCount = targets.filter(target => target.review).length;
 
   return (
@@ -986,6 +1120,7 @@ function ReviewPanel({ targets = [], saving, onReview }) {
               key={target.user.id}
               target={target}
               saving={saving}
+              currentUserId={currentUserId}
               onReview={rating => onReview(target.user.id, rating)}
             />
           ))}
@@ -995,7 +1130,7 @@ function ReviewPanel({ targets = [], saving, onReview }) {
   );
 }
 
-function ReviewTarget({ target, saving, onReview }) {
+function ReviewTarget({ target, saving, onReview, currentUserId }) {
   const user = target.user;
 
   return (
@@ -1005,6 +1140,7 @@ function ReviewTarget({ target, saving, onReview }) {
         <strong>{user.name}</strong>
         <span>{target.isOrganizer ? "Организатор" : "Участник"} · рейтинг {formatRating(user.stats?.rating)}</span>
       </div>
+      <ReportUserButton user={user} currentUserId={currentUserId} compact />
       {target.review ? (
         <span className="rt-review-done">{stars(target.review.rating)}</span>
       ) : (
@@ -1090,7 +1226,7 @@ function WorkoutForm({ mode, form, setForm, saving, onSubmit }) {
   );
 }
 
-function ProfileScreen({ user, profile, setProfile, saving, onSubmit, onAvatarChange, onLogout }) {
+function ProfileScreen({ user, profile, setProfile, moderationNotifications, saving, onSubmit, onAvatarChange, onLogout }) {
   const set = key => event => {
     const value = event.target.type === "checkbox" ? event.target.checked : event.target.value;
     setProfile(prev => ({ ...prev, [key]: value }));
@@ -1125,6 +1261,8 @@ function ProfileScreen({ user, profile, setProfile, saving, onSubmit, onAvatarCh
         </div>
       </div>
       <StatsGrid stats={user.stats} />
+      <AchievementsPanel achievements={user.achievements} />
+      <ModerationNoticeList user={user} notifications={moderationNotifications} />
       <form className="rt-form rt-panel" onSubmit={onSubmit}>
         <label>
           <span>Имя</span>
@@ -1161,6 +1299,66 @@ function ProfileScreen({ user, profile, setProfile, saving, onSubmit, onAvatarCh
         </div>
       </form>
     </section>
+  );
+}
+
+function ModerationNoticeList({ user, notifications = [] }) {
+  const warnings = Number(user.moderation?.warnings || 0);
+  if (!notifications.length && !warnings) return null;
+  return (
+    <div className="rt-panel rt-moderation-panel">
+      <SectionHead title="Модерация" caption={warnings ? `предупреждений: ${warnings}` : "важные сообщения от администратора"} />
+      <div className="rt-notification-list">
+        {notifications.length ? (
+          notifications.slice(0, 3).map(notification => (
+            <NotificationItem key={notification.id} notification={notification} compact />
+          ))
+        ) : (
+          <article className="rt-notification moderation">
+            <div>
+              <strong>Есть предупреждения от модерации</strong>
+              <p>Подробности новых предупреждений будут появляться в уведомлениях.</p>
+            </div>
+          </article>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function NotificationsScreen({ notifications, onRead }) {
+  return (
+    <section className="rt-page">
+      <SectionHead title="Уведомления" caption={`${notifications.filter(item => !item.read_at).length} новых`} />
+      <div className="rt-notification-list">
+        {notifications.map(notification => (
+          <NotificationItem
+            key={notification.id}
+            notification={notification}
+            onRead={() => onRead(notification.id)}
+          />
+        ))}
+      </div>
+      {!notifications.length && (
+        <EmptyState title="Уведомлений пока нет" text="Предупреждения и решения администрации появятся здесь." />
+      )}
+    </section>
+  );
+}
+
+function NotificationItem({ notification, compact = false, onRead }) {
+  const isModeration = ["moderation_warning", "moderation_ban"].includes(notification.type);
+  return (
+    <article className={`rt-notification ${notification.read_at ? "" : "unread"} ${isModeration ? "moderation" : ""}`}>
+      <div>
+        <strong>{notification.title}</strong>
+        <p>{notification.message}</p>
+        {!compact && <span>{new Date(notification.created_at).toLocaleString()}</span>}
+      </div>
+      {!notification.read_at && onRead && (
+        <button type="button" onClick={onRead}>Прочитано</button>
+      )}
+    </article>
   );
 }
 
@@ -1263,22 +1461,33 @@ function StatsGrid({ stats = {} }) {
   );
 }
 
-function NavItems({ active, onChange, compact = false }) {
-  const items = [
+function NavItems({ active, onChange, compact = false, unreadCount = 0 }) {
+  const allItems = [
     ["home", "home", "Главная"],
     ["workouts", "runner", "Тренировки"],
     ["organized", "clipboard", "Организую"],
     ["participating", "check", "Участвую"],
     ["create", "plus", "Создать"],
+    ["notifications", "bell", "Уведомления"],
     ["profile", "user", "Профиль"],
   ];
+  const compactItems = [
+    ["home", "home", "Главная"],
+    ["workouts", "runner", "Тренировки"],
+    ["create", "plus", "Создать"],
+    ["notifications", "bell", "Уведомления"],
+    ["profile", "user", "Профиль"],
+  ];
+  const items = compact ? compactItems : allItems;
+  const activeItem = compact && ["organized", "participating"].includes(active) ? "home" : active;
 
   return (
     <div className={compact ? "rt-nav compact" : "rt-nav"}>
       {items.map(([id, icon, label]) => (
-        <button className={active === id ? "active" : ""} type="button" key={id} onClick={() => onChange(id)} aria-label={label}>
+        <button className={activeItem === id ? "active" : ""} type="button" key={id} onClick={() => onChange(id)} aria-label={label}>
           <Icon name={icon} />
           <span>{label}</span>
+          {id === "notifications" && unreadCount > 0 && <em className="rt-nav-badge">{unreadCount}</em>}
         </button>
       ))}
     </div>
@@ -1362,6 +1571,29 @@ function Avatar({ user, large = false }) {
   );
 }
 
+function AchievementsPanel({ achievements = [] }) {
+  return (
+    <div className="rt-panel rt-achievements-panel">
+      <SectionHead title="Достижения" caption={`${achievements.length} получено`} />
+      {achievements.length ? (
+        <div className="rt-achievement-grid">
+          {achievements.map(achievement => (
+            <article className="rt-achievement" key={achievement.id}>
+              <span>{achievementIcon(achievement.icon)}</span>
+              <div>
+                <strong>{achievement.title}</strong>
+                <em>{achievement.description}</em>
+              </div>
+            </article>
+          ))}
+        </div>
+      ) : (
+        <p className="rt-muted">Полученных достижений пока нет.</p>
+      )}
+    </div>
+  );
+}
+
 function workoutPayload(form) {
   return {
     title: form.title.trim(),
@@ -1428,6 +1660,19 @@ function formatRating(value) {
   return value ? Number(value).toFixed(1) : "нет";
 }
 
+function achievementIcon(value) {
+  return {
+    medal: "🏅",
+    trophy: "🏆",
+    route: "🗺",
+    sunrise: "🌅",
+    star: "★",
+    zap: "⚡",
+    flame: "🔥",
+    crown: "♕",
+  }[value] || value || "★";
+}
+
 function stars(value) {
   const rating = Math.max(0, Math.min(5, Number(value) || 0));
   return "★".repeat(rating) + "☆".repeat(5 - rating);
@@ -1488,6 +1733,7 @@ function titleFor(screen, activeTab, mode) {
     detail: "Карточка тренировки",
     organizer: "Панель организатора",
     requests: "Заявки",
+    notifications: "Уведомления",
     profile: "Профиль",
     userProfile: "Профиль пользователя",
   }[screen] || {
@@ -1496,6 +1742,7 @@ function titleFor(screen, activeTab, mode) {
     organized: "Организую",
     participating: "Участвую",
     create: "Создать",
+    notifications: "Уведомления",
     profile: "Профиль",
   }[activeTab] || "RunTogether";
 }
@@ -1527,6 +1774,7 @@ function Icon({ name }) {
     clipboard: <><rect x="8" y="3" width="8" height="4" rx="1" /><path d="M9 5H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-3" /><path d="M8 12h8" /><path d="M8 16h5" /></>,
     check: <><path d="M20 6L9 17l-5-5" /><circle cx="12" cy="12" r="10" /></>,
     plus: <><circle cx="12" cy="12" r="10" /><path d="M12 8v8M8 12h8" /></>,
+    bell: <><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" /><path d="M10 21h4" /></>,
     user: <><path d="M20 21a8 8 0 0 0-16 0" /><circle cx="12" cy="7" r="4" /></>,
     users: <><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></>,
     edit: <><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" /></>,

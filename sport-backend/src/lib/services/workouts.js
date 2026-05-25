@@ -1,4 +1,5 @@
 import { query } from "../server/db";
+import { evaluateAchievements } from "./achievements";
 
 const TERMINAL = new Set(["cancelled", "completed"]);
 
@@ -16,6 +17,7 @@ export function deriveWorkoutStatus(workout, confirmedCount = 0, now = new Date(
 export async function syncWorkoutStatus(clientOrPool, workoutId) {
   const runner = clientOrPool?.query ? clientOrPool : null;
   const exec = (text, params) => (runner ? runner.query(text, params) : query(text, params));
+  const achievementClient = { query: exec };
 
   const { rows } = await exec(
     `select w.*,
@@ -36,9 +38,30 @@ export async function syncWorkoutStatus(clientOrPool, workoutId) {
       "update workouts set status = $2, updated_at = now() where id = $1 returning *",
       [workoutId, nextStatus],
     );
+    if (nextStatus === "completed") {
+      await evaluateWorkoutAchievements(achievementClient, workoutId);
+    }
     return updated.rows[0];
   }
   return workout;
+}
+
+async function evaluateWorkoutAchievements(client, workoutId) {
+  const { rows } = await client.query(
+    `select organizer_id as user_id
+       from workouts
+      where id = $1
+     union
+     select user_id
+       from workout_participants
+      where workout_id = $1
+        and status = 'confirmed'`,
+    [workoutId],
+  );
+
+  for (const row of rows) {
+    await evaluateAchievements(client, row.user_id);
+  }
 }
 
 export function workoutPayload(row) {

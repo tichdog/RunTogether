@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "../api/client";
 import { Avatar, Btn, Card, EmptyState, Input, Select, StatusBadge } from "../components/ui";
+import { ReportUserButton } from "../components/ReportUserButton";
 import { T } from "../tokens";
 
 function initialForm(participantLimit = 20) {
@@ -17,7 +18,7 @@ function initialForm(participantLimit = 20) {
   };
 }
 
-export function Workouts({ selectedWorkoutId, onSelectWorkout, onBackToList }) {
+export function Workouts({ selectedWorkoutId, onSelectWorkout, onBackToList, currentUserId }) {
   const [workouts, setWorkouts] = useState([]);
   const [selectedWorkout, setSelectedWorkout] = useState(null);
   const [requests, setRequests] = useState([]);
@@ -185,6 +186,7 @@ export function Workouts({ selectedWorkoutId, onSelectWorkout, onBackToList }) {
         onJoin={join}
         onRespond={respondRequest}
         onRemoveParticipant={removeParticipant}
+        currentUserId={currentUserId}
       />
     );
   }
@@ -277,7 +279,7 @@ export function Workouts({ selectedWorkoutId, onSelectWorkout, onBackToList }) {
   );
 }
 
-function WorkoutDetail({ workout, requests, loading, saving, message, onBack, onCancel, onJoin, onRespond, onRemoveParticipant }) {
+function WorkoutDetail({ workout, requests, loading, saving, message, onBack, onCancel, onJoin, onRespond, onRemoveParticipant, currentUserId }) {
   if (loading) {
     return <div style={{ padding: 32, color: T.textMuted }}>Загрузка тренировки...</div>;
   }
@@ -349,14 +351,16 @@ function WorkoutDetail({ workout, requests, loading, saving, message, onBack, on
             <h2 style={sectionTitle}>Участники</h2>
             <div style={{ display: "grid", gap: 8 }}>
               <PersonRow
-                user={workout.organizer || { name: workout.organizerName, initials: initials(workout.organizerName) }}
+                user={workout.organizer || { id: workout.organizerId, name: workout.organizerName, initials: initials(workout.organizerName) }}
                 label="Организатор"
+                currentUserId={currentUserId}
               />
               {participants.map(participant => (
                 <PersonRow
                   key={participant.id}
                   user={participant}
                   label="Участник"
+                  currentUserId={currentUserId}
                   action={(
                     <Btn
                       danger
@@ -382,6 +386,7 @@ function WorkoutDetail({ workout, requests, loading, saving, message, onBack, on
                 request={request}
                 saving={saving}
                 onRespond={onRespond}
+                currentUserId={currentUserId}
               />
             ))}
             {!pendingRequests.length && <p style={{ color: T.textMuted, fontSize: 13, margin: 0 }}>Новых заявок нет.</p>}
@@ -394,8 +399,9 @@ function WorkoutDetail({ workout, requests, loading, saving, message, onBack, on
                 {historicRequests.map(request => (
                   <PersonRow
                     key={request.id}
-                    user={{ name: request.full_name || request.email, initials: initials(request.full_name || request.email) }}
+                    user={{ id: request.user_id, name: request.full_name || request.email, initials: initials(request.full_name || request.email) }}
                     label={participantLabel(request.status)}
+                    currentUserId={currentUserId}
                   />
                 ))}
               </div>
@@ -407,11 +413,12 @@ function WorkoutDetail({ workout, requests, loading, saving, message, onBack, on
   );
 }
 
-function RequestRow({ request, saving, onRespond }) {
+function RequestRow({ request, saving, onRespond, currentUserId }) {
   return (
     <PersonRow
-      user={{ name: request.full_name || request.email, initials: initials(request.full_name || request.email) }}
+      user={{ id: request.user_id, name: request.full_name || request.email, initials: initials(request.full_name || request.email) }}
       label={request.email}
+      currentUserId={currentUserId}
       action={(
         <div style={{ display: "flex", gap: 6 }}>
           <Btn variant="primary" disabled={saving} onClick={() => onRespond(request.id, "confirmed")}>Принять</Btn>
@@ -422,7 +429,8 @@ function RequestRow({ request, saving, onRespond }) {
   );
 }
 
-function PersonRow({ user, label, action }) {
+function PersonRow({ user, label, action, currentUserId }) {
+  const reportAction = user?.id ? <ReportUserButton user={user} currentUserId={currentUserId} compact /> : null;
   return (
     <div style={{
       display: "flex",
@@ -440,7 +448,10 @@ function PersonRow({ user, label, action }) {
           <span style={{ display: "block", color: T.textMuted, fontSize: 12 }}>{label}</span>
         </div>
       </div>
-      {action}
+      <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
+        {reportAction}
+        {action}
+      </div>
     </div>
   );
 }
