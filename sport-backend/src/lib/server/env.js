@@ -16,5 +16,7 @@ export const env = {
   cookieName: process.env.COOKIE_NAME || 'sport_session',
   uploadUrlPath: '/uploads',
   cronSecret: process.env.CRON_SECRET || '',
+  logLevel: process.env.LOG_LEVEL || 'info',
+  logFile: process.env.LOG_FILE || 'logs/backend.log',
   maxUploadBytes: numberFromEnv('MAX_UPLOAD_BYTES', 3 * 1024 * 1024),
 }
