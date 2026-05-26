@@ -1,8 +1,8 @@
-const ACTIVE_WORKOUT_STATUSES = ["planned", "open", "full", "in_progress"];
-const ACTIVE_PARTICIPATION_STATUSES = ["confirmed", "pending"];
+const ACTIVE_WORKOUT_STATUSES = ['planned', 'open', 'full', 'in_progress']
+const ACTIVE_PARTICIPATION_STATUSES = ['confirmed', 'pending']
 
 export async function lockParticipationForUser(client, userId) {
-  await client.query("select pg_advisory_xact_lock($1::bigint)", [userId]);
+  await client.query('select pg_advisory_xact_lock($1::bigint)', [userId])
 }
 
 export async function findParticipationConflict(client, userId, workout, options = {}) {
@@ -10,7 +10,7 @@ export async function findParticipationConflict(client, userId, workout, options
     excludeWorkoutId = workout.id,
     participationStatuses = ACTIVE_PARTICIPATION_STATUSES,
     includeOrganized = true,
-  } = options;
+  } = options
 
   const { rows } = await client.query(
     `with candidate_workouts as (
@@ -59,10 +59,10 @@ export async function findParticipationConflict(client, userId, workout, options
       participationStatuses,
       ACTIVE_WORKOUT_STATUSES,
       includeOrganized,
-    ],
-  );
+    ]
+  )
 
-  return rows[0] || null;
+  return rows[0] || null
 }
 
 export async function cancelOverlappingPendingRequests(client, userId, workout) {
@@ -85,25 +85,25 @@ export async function cancelOverlappingPendingRequests(client, userId, workout) 
       Number(workout.duration_minutes || 60),
       workout.id,
       ACTIVE_WORKOUT_STATUSES,
-    ],
-  );
+    ]
+  )
 
-  return rows;
+  return rows
 }
 
-export function participationConflictMessage(conflict, subject = "Вы") {
-  const isCurrentUser = subject === "Вы";
+export function participationConflictMessage(conflict, subject = 'Вы') {
+  const isCurrentUser = subject === 'Вы'
 
   if (conflict.is_organizer) {
-    const verb = isCurrentUser ? "организуете" : "организует";
-    return `${subject} уже ${verb} тренировку в это время: ${conflict.title}`;
+    const verb = isCurrentUser ? 'организуете' : 'организует'
+    return `${subject} уже ${verb} тренировку в это время: ${conflict.title}`
   }
 
-  if (conflict.participation_status === "confirmed") {
-    const verb = isCurrentUser ? "подтверждены" : "подтвержден";
-    return `${subject} уже ${verb} на тренировку в это время: ${conflict.title}`;
+  if (conflict.participation_status === 'confirmed') {
+    const verb = isCurrentUser ? 'подтверждены' : 'подтвержден'
+    return `${subject} уже ${verb} на тренировку в это время: ${conflict.title}`
   }
 
-  const verb = isCurrentUser ? "отправили" : "отправил";
-  return `${subject} уже ${verb} заявку на тренировку в это время: ${conflict.title}`;
+  const verb = isCurrentUser ? 'отправили' : 'отправил'
+  return `${subject} уже ${verb} заявку на тренировку в это время: ${conflict.title}`
 }

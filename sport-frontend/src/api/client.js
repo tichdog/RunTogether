@@ -1,135 +1,152 @@
-const API_BASE = import.meta.env.VITE_API_URL || "";
+const API_BASE = import.meta.env.VITE_API_URL || ''
 
 async function request(path, options = {}) {
-  const isFormData = options.body instanceof FormData;
+  const isFormData = options.body instanceof FormData
   const response = await fetch(`${API_BASE}${path}`, {
-    credentials: "include",
+    credentials: 'include',
     headers: isFormData
       ? { ...(options.headers || {}) }
       : {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
           ...(options.headers || {}),
         },
     ...options,
-  });
+  })
 
-  if (response.status === 204) return null;
+  if (response.status === 204) return null
 
-  const data = await response.json().catch(() => ({}));
+  const data = await response.json().catch(() => ({}))
   if (!response.ok) {
-    throw new Error(data.error || "Ошибка запроса");
+    throw new Error(data.error || 'Ошибка запроса')
   }
-  return data;
+  return data
 }
 
 export const api = {
-  register: payload => request("/api/auth/register", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  }),
-  checkEmail: (email, options = {}) => request(`/api/auth/email?email=${encodeURIComponent(email)}`, options),
-  login: payload => request("/api/auth/login", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  }),
-  logout: () => request("/api/auth/logout", { method: "POST" }),
-  me: () => request("/api/auth/me"),
+  register: (payload) =>
+    request('/api/auth/register', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  checkEmail: (email, options = {}) =>
+    request(`/api/auth/email?email=${encodeURIComponent(email)}`, options),
+  login: (payload) =>
+    request('/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  logout: () => request('/api/auth/logout', { method: 'POST' }),
+  me: () => request('/api/auth/me'),
 
-  users: params => request(`/api/users${toQuery(params)}`),
-  user: id => request(`/api/users/${id}`),
-  updateMe: payload => request("/api/users/me", {
-    method: "PATCH",
-    body: JSON.stringify(payload),
-  }),
-  updateMyAvatar: file => uploadAvatar("/api/users/me/avatar", file),
+  users: (params) => request(`/api/users${toQuery(params)}`),
+  user: (id) => request(`/api/users/${id}`),
+  updateMe: (payload) =>
+    request('/api/users/me', {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    }),
+  updateMyAvatar: (file) => uploadAvatar('/api/users/me/avatar', file),
   updateUserAvatar: (id, file) => uploadAvatar(`/api/users/${id}/avatar`, file),
-  updateRole: (id, role) => request(`/api/users/${id}/role`, {
-    method: "PATCH",
-    body: JSON.stringify({ role }),
-  }),
-  blockUser: (id, payload = {}) => request(`/api/users/${id}/block`, {
-    method: "PATCH",
-    body: JSON.stringify(payload),
-  }),
-  deleteUser: id => request(`/api/users/${id}`, { method: "DELETE" }),
-  history: id => request(`/api/users/${id}/history`),
-  achievements: id => request(`/api/users/${id}/achievements`),
+  updateRole: (id, role) =>
+    request(`/api/users/${id}/role`, {
+      method: 'PATCH',
+      body: JSON.stringify({ role }),
+    }),
+  blockUser: (id, payload = {}) =>
+    request(`/api/users/${id}/block`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    }),
+  deleteUser: (id) => request(`/api/users/${id}`, { method: 'DELETE' }),
+  history: (id) => request(`/api/users/${id}/history`),
+  achievements: (id) => request(`/api/users/${id}/achievements`),
 
-  workouts: params => request(`/api/workouts${toQuery(params)}`),
-  workout: id => request(`/api/workouts/${id}`),
-  createWorkout: payload => request("/api/workouts", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  }),
-  updateWorkout: (id, payload) => request(`/api/workouts/${id}`, {
-    method: "PATCH",
-    body: JSON.stringify(payload),
-  }),
-  cancelWorkout: (id, reason) => request(`/api/workouts/${id}/cancel`, {
-    method: "POST",
-    body: JSON.stringify({ reason }),
-  }),
-  joinWorkout: id => request(`/api/workouts/${id}/requests`, { method: "POST" }),
-  workoutRequests: id => request(`/api/workouts/${id}/requests`),
-  reviewTargets: id => request(`/api/workouts/${id}/reviews`),
-  respondRequest: (workoutId, requestId, status) => request(`/api/workouts/${workoutId}/requests/${requestId}`, {
-    method: "PATCH",
-    body: JSON.stringify({ status }),
-  }),
-  cancelParticipation: (id, userId) => request(`/api/workouts/${id}/participation`, {
-    method: "DELETE",
-    body: JSON.stringify(userId ? { userId } : {}),
-  }),
-  createReview: (workoutId, payload) => request(`/api/workouts/${workoutId}/reviews`, {
-    method: "POST",
-    body: JSON.stringify(payload),
-  }),
+  workouts: (params) => request(`/api/workouts${toQuery(params)}`),
+  workout: (id) => request(`/api/workouts/${id}`),
+  createWorkout: (payload) =>
+    request('/api/workouts', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  updateWorkout: (id, payload) =>
+    request(`/api/workouts/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    }),
+  cancelWorkout: (id, reason) =>
+    request(`/api/workouts/${id}/cancel`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    }),
+  joinWorkout: (id) => request(`/api/workouts/${id}/requests`, { method: 'POST' }),
+  workoutRequests: (id) => request(`/api/workouts/${id}/requests`),
+  reviewTargets: (id) => request(`/api/workouts/${id}/reviews`),
+  respondRequest: (workoutId, requestId, status) =>
+    request(`/api/workouts/${workoutId}/requests/${requestId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    }),
+  cancelParticipation: (id, userId) =>
+    request(`/api/workouts/${id}/participation`, {
+      method: 'DELETE',
+      body: JSON.stringify(userId ? { userId } : {}),
+    }),
+  createReview: (workoutId, payload) =>
+    request(`/api/workouts/${workoutId}/reviews`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
 
-  notifications: () => request("/api/notifications"),
-  readNotification: id => request(`/api/notifications/${id}/read`, { method: "PATCH" }),
-  reports: params => request(`/api/reports${toQuery(params)}`),
-  createReport: payload => request("/api/reports", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  }),
-  moderateReport: (id, payload) => request(`/api/reports/${id}`, {
-    method: "PATCH",
-    body: JSON.stringify(payload),
-  }),
-  activities: () => request("/api/activities"),
-  settings: () => request("/api/settings"),
-  saveSettings: payload => request("/api/settings", {
-    method: "PATCH",
-    body: JSON.stringify(payload),
-  }),
-  adminAchievements: () => request("/api/achievements"),
-  createAchievement: payload => request("/api/achievements", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  }),
-  updateAchievement: (id, payload) => request(`/api/achievements/${id}`, {
-    method: "PATCH",
-    body: JSON.stringify(payload),
-  }),
-  deleteAchievement: id => request(`/api/achievements/${id}`, { method: "DELETE" }),
-};
+  notifications: () => request('/api/notifications'),
+  readNotification: (id) => request(`/api/notifications/${id}/read`, { method: 'PATCH' }),
+  reports: (params) => request(`/api/reports${toQuery(params)}`),
+  createReport: (payload) =>
+    request('/api/reports', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  moderateReport: (id, payload) =>
+    request(`/api/reports/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    }),
+  activities: () => request('/api/activities'),
+  settings: () => request('/api/settings'),
+  saveSettings: (payload) =>
+    request('/api/settings', {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    }),
+  adminAchievements: () => request('/api/achievements'),
+  createAchievement: (payload) =>
+    request('/api/achievements', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  updateAchievement: (id, payload) =>
+    request(`/api/achievements/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    }),
+  deleteAchievement: (id) => request(`/api/achievements/${id}`, { method: 'DELETE' }),
+}
 
 function toQuery(params = {}) {
-  const search = new URLSearchParams();
+  const search = new URLSearchParams()
   Object.entries(params || {}).forEach(([key, value]) => {
-    if (value !== undefined && value !== null && value !== "") {
-      search.set(key, value);
+    if (value !== undefined && value !== null && value !== '') {
+      search.set(key, value)
     }
-  });
-  const text = search.toString();
-  return text ? `?${text}` : "";
+  })
+  const text = search.toString()
+  return text ? `?${text}` : ''
 }
 
 function uploadAvatar(path, file) {
-  const form = new FormData();
-  form.append("avatar", file);
+  const form = new FormData()
+  form.append('avatar', file)
   return request(path, {
-    method: "POST",
+    method: 'POST',
     body: form,
-  });
+  })
 }

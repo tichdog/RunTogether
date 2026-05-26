@@ -1,5 +1,11 @@
 :root {
-  font-family: Inter, "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family:
+    Inter,
+    'Segoe UI',
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    sans-serif;
   color: #1a1915;
   background: #fafaf9;
   font-synthesis: none;
@@ -159,17 +165,17 @@ img {
   }
 
   .user-row > .user-cell.user-cell-id::before {
-    content: "ID: ";
+    content: 'ID: ';
   }
 
   .user-row > .user-cell.user-cell-email::before {
-    content: "Email: ";
+    content: 'Email: ';
     color: #9e9b93;
     font-weight: 700;
   }
 
   .user-row > .user-cell.user-cell-rating::before {
-    content: "Рейтинг: ";
+    content: 'Рейтинг: ';
     color: #9e9b93;
     font-weight: 700;
   }
@@ -187,7 +193,7 @@ img {
   }
 
   .user-row > .user-cell.user-cell-verified::before {
-    content: "Верификация: ";
+    content: 'Верификация: ';
     color: #9e9b93;
     font-weight: 700;
   }

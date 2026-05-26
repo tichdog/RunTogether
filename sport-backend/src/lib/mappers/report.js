@@ -15,7 +15,7 @@ export const REPORT_SELECT = `
     join users reporter on reporter.id = r.reporter_id
     join users reported on reported.id = r.reported_user_id
     left join users moderator on moderator.id = r.moderator_id
-`;
+`
 
 export function mapReport(row) {
   return {
@@ -42,9 +42,11 @@ export function mapReport(row) {
       warnings: Number(row.reported_user_warnings || 0),
       blockedUntil: row.reported_user_blocked_until,
     },
-    moderator: row.moderator_id ? {
-      id: row.moderator_id,
-      name: row.moderator_name,
-    } : null,
-  };
+    moderator: row.moderator_id
+      ? {
+          id: row.moderator_id,
+          name: row.moderator_name,
+        }
+      : null,
+  }
 }

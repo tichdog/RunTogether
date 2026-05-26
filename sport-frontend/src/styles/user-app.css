@@ -20,7 +20,7 @@
   grid-template-columns: 264px minmax(0, 1fr);
   background: var(--rt-bg);
   color: var(--rt-text);
-  font-family: Inter, "Segoe UI", system-ui, sans-serif;
+  font-family: Inter, 'Segoe UI', system-ui, sans-serif;
 }
 
 .rt-sidebar {
@@ -464,7 +464,7 @@
 }
 
 .rt-status::before {
-  content: "";
+  content: '';
   width: 7px;
   height: 7px;
   flex: 0 0 auto;

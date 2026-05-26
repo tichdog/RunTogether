@@ -1,23 +1,23 @@
-import { query } from "../server/db";
-import { evaluateAchievements } from "./achievements";
+import { query } from '../server/db'
+import { evaluateAchievements } from './achievements'
 
-const TERMINAL = new Set(["cancelled", "completed"]);
+const TERMINAL = new Set(['cancelled', 'completed'])
 
 export function deriveWorkoutStatus(workout, confirmedCount = 0, now = new Date()) {
-  if (!workout || workout.status === "cancelled") return workout?.status;
-  const start = new Date(workout.start_at);
-  const end = new Date(start.getTime() + Number(workout.duration_minutes || 60) * 60000);
+  if (!workout || workout.status === 'cancelled') return workout?.status
+  const start = new Date(workout.start_at)
+  const end = new Date(start.getTime() + Number(workout.duration_minutes || 60) * 60000)
 
-  if (now >= end) return "completed";
-  if (now >= start) return "in_progress";
-  if (Number(confirmedCount) >= Number(workout.participant_limit)) return "full";
-  return "open";
+  if (now >= end) return 'completed'
+  if (now >= start) return 'in_progress'
+  if (Number(confirmedCount) >= Number(workout.participant_limit)) return 'full'
+  return 'open'
 }
 
 export async function syncWorkoutStatus(clientOrPool, workoutId) {
-  const runner = clientOrPool?.query ? clientOrPool : null;
-  const exec = (text, params) => (runner ? runner.query(text, params) : query(text, params));
-  const achievementClient = { query: exec };
+  const runner = clientOrPool?.query ? clientOrPool : null
+  const exec = (text, params) => (runner ? runner.query(text, params) : query(text, params))
+  const achievementClient = { query: exec }
 
   const { rows } = await exec(
     `select w.*,
@@ -26,24 +26,24 @@ export async function syncWorkoutStatus(clientOrPool, workoutId) {
        left join workout_participants wp on wp.workout_id = w.id
       where w.id = $1
       group by w.id`,
-    [workoutId],
-  );
+    [workoutId]
+  )
 
-  const workout = rows[0];
-  if (!workout || TERMINAL.has(workout.status)) return workout;
+  const workout = rows[0]
+  if (!workout || TERMINAL.has(workout.status)) return workout
 
-  const nextStatus = deriveWorkoutStatus(workout, workout.confirmed_count);
+  const nextStatus = deriveWorkoutStatus(workout, workout.confirmed_count)
   if (nextStatus !== workout.status) {
     const updated = await exec(
-      "update workouts set status = $2, updated_at = now() where id = $1 returning *",
-      [workoutId, nextStatus],
-    );
-    if (nextStatus === "completed") {
-      await evaluateWorkoutAchievements(achievementClient, workoutId);
+      'update workouts set status = $2, updated_at = now() where id = $1 returning *',
+      [workoutId, nextStatus]
+    )
+    if (nextStatus === 'completed') {
+      await evaluateWorkoutAchievements(achievementClient, workoutId)
     }
-    return updated.rows[0];
+    return updated.rows[0]
   }
-  return workout;
+  return workout
 }
 
 async function evaluateWorkoutAchievements(client, workoutId) {
@@ -56,16 +56,16 @@ async function evaluateWorkoutAchievements(client, workoutId) {
        from workout_participants
       where workout_id = $1
         and status = 'confirmed'`,
-    [workoutId],
-  );
+    [workoutId]
+  )
 
   for (const row of rows) {
-    await evaluateAchievements(client, row.user_id);
+    await evaluateAchievements(client, row.user_id)
   }
 }
 
 export function workoutPayload(row) {
-  const confirmed = Number(row.confirmed_count || 0);
+  const confirmed = Number(row.confirmed_count || 0)
   return {
     id: row.id,
     organizerId: row.organizer_id,
@@ -94,9 +94,11 @@ export function workoutPayload(row) {
     freePlaces: Math.max(0, Number(row.participant_limit) - confirmed),
     status: row.status,
     participantStatus: row.participant_status || null,
-    participantRequestId: row.participant_request_id == null ? null : Number(row.participant_request_id),
+    participantRequestId:
+      row.participant_request_id == null ? null : Number(row.participant_request_id),
     cancellationReason: row.cancellation_reason,
     createdAt: row.created_at,
-    distanceFromUserKm: row.distance_from_user_km == null ? null : Number(row.distance_from_user_km),
-  };
+    distanceFromUserKm:
+      row.distance_from_user_km == null ? null : Number(row.distance_from_user_km),
+  }
 }

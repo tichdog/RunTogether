@@ -1,29 +1,45 @@
-import { ROLE_LABELS, T } from "../../tokens";
-import { Avatar, Btn } from "../ui";
+import { ROLE_LABELS, T } from '../../tokens'
+import { Avatar, Btn } from '../ui'
 
 const NAV_ITEMS = [
-  { id: "Обзор", icon: "□" },
-  { id: "Пользователи", icon: "○" },
-  { id: "Тренировки", icon: "◇" },
-  { id: "Жалобы", icon: "!" },
-  { id: "Достижения", icon: "☆" },
-  { id: "Настройки", icon: "⚙" },
-];
+  { id: 'Обзор', icon: '□' },
+  { id: 'Пользователи', icon: '○' },
+  { id: 'Тренировки', icon: '◇' },
+  { id: 'Жалобы', icon: '!' },
+  { id: 'Достижения', icon: '☆' },
+  { id: 'Настройки', icon: '⚙' },
+]
 
 export function Sidebar({ active, setActive, user, onLogout }) {
   return (
-    <aside className="app-sidebar" style={{
-      width: 220, background: T.sidebar, color: T.sidebarText,
-      display: "flex", flexDirection: "column", flexShrink: 0,
-      height: "100vh",
-    }}>
-      <div style={{ padding: "20px", borderBottom: "1px solid #2D2C28" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{
-            width: 28, height: 28, borderRadius: 8, background: T.accent,
-            display: "flex", alignItems: "center", justifyContent: "center",
-            color: "#fff", fontSize: 14, fontWeight: 800,
-          }}>
+    <aside
+      className="app-sidebar"
+      style={{
+        width: 220,
+        background: T.sidebar,
+        color: T.sidebarText,
+        display: 'flex',
+        flexDirection: 'column',
+        flexShrink: 0,
+        height: '100vh',
+      }}
+    >
+      <div style={{ padding: '20px', borderBottom: '1px solid #2D2C28' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div
+            style={{
+              width: 28,
+              height: 28,
+              borderRadius: 8,
+              background: T.accent,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#fff',
+              fontSize: 14,
+              fontWeight: 800,
+            }}
+          >
             R
           </div>
           <div>
@@ -33,44 +49,67 @@ export function Sidebar({ active, setActive, user, onLogout }) {
         </div>
       </div>
 
-      <nav style={{ flex: 1, padding: "12px 10px" }}>
+      <nav style={{ flex: 1, padding: '12px 10px' }}>
         {NAV_ITEMS.map(({ id, icon }) => {
-          const isActive = active === id;
+          const isActive = active === id
           return (
             <button
               key={id}
               onClick={() => setActive(id)}
               style={{
-                display: "flex", alignItems: "center", gap: 10,
-                width: "100%", padding: "10px", border: "none",
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                width: '100%',
+                padding: '10px',
+                border: 'none',
                 borderRadius: T.radiusSm,
-                background: isActive ? T.sidebarActive : "transparent",
-                color: isActive ? "#FFFFFF" : T.sidebarMuted,
-                cursor: "pointer", fontSize: 13, fontWeight: isActive ? 700 : 500,
-                textAlign: "left", fontFamily: "inherit", marginBottom: 4,
+                background: isActive ? T.sidebarActive : 'transparent',
+                color: isActive ? '#FFFFFF' : T.sidebarMuted,
+                cursor: 'pointer',
+                fontSize: 13,
+                fontWeight: isActive ? 700 : 500,
+                textAlign: 'left',
+                fontFamily: 'inherit',
+                marginBottom: 4,
               }}
             >
-              <span style={{ width: 18, textAlign: "center" }}>{icon}</span>
+              <span style={{ width: 18, textAlign: 'center' }}>{icon}</span>
               {id}
             </button>
-          );
+          )
         })}
       </nav>
 
-      <div style={{ padding: "14px 16px", borderTop: "1px solid #2D2C28" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 10 }}>
+      <div style={{ padding: '14px 16px', borderTop: '1px solid #2D2C28' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 10 }}>
           <Avatar initials={user?.initials} src={user?.avatarUrl} size={30} />
           <div style={{ minWidth: 0 }}>
-            <div style={{ overflow: "hidden", fontSize: 12, fontWeight: 700, color: T.sidebarText, textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{user?.name}</div>
+            <div
+              style={{
+                overflow: 'hidden',
+                fontSize: 12,
+                fontWeight: 700,
+                color: T.sidebarText,
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {user?.name}
+            </div>
             <div style={{ fontSize: 11, color: T.sidebarMuted, marginTop: 1 }}>
-              {ROLE_LABELS[user?.role] || "Участник"}
+              {ROLE_LABELS[user?.role] || 'Участник'}
             </div>
           </div>
         </div>
-        <Btn onClick={onLogout} variant="ghost" style={{ width: "100%", color: T.sidebarText, borderColor: "#3B3A36" }}>
+        <Btn
+          onClick={onLogout}
+          variant="ghost"
+          style={{ width: '100%', color: T.sidebarText, borderColor: '#3B3A36' }}
+        >
           Выйти
         </Btn>
       </div>
     </aside>
-  );
+  )
 }

@@ -1,22 +1,22 @@
-import { requireAdmin, requireAuth } from "@/lib/server/auth";
-import { query, transaction } from "@/lib/server/db";
-import { badRequest, notFound } from "@/lib/server/http-error";
-import { json, noContent, readJson, route } from "@/lib/server/response";
-import { evaluateAchievementsForAllUsers } from "@/lib/services/achievements";
-import { normalizeAchievementPayload } from "@/lib/services/achievement-definitions";
+import { requireAdmin, requireAuth } from '@/lib/server/auth'
+import { query, transaction } from '@/lib/server/db'
+import { badRequest, notFound } from '@/lib/server/http-error'
+import { json, noContent, readJson, route } from '@/lib/server/response'
+import { evaluateAchievementsForAllUsers } from '@/lib/services/achievements'
+import { normalizeAchievementPayload } from '@/lib/services/achievement-definitions'
 
 export const PATCH = route(async (request, context) => {
-  const user = await requireAuth(request);
-  requireAdmin(user);
-  const { id } = await context.params;
-  const payload = normalizeAchievementPayload(await readJson(request), { partial: true });
+  const user = await requireAuth(request)
+  requireAdmin(user)
+  const { id } = await context.params
+  const payload = normalizeAchievementPayload(await readJson(request), { partial: true })
 
   if (!Object.keys(payload).length) {
-    throw badRequest("Нет данных для обновления");
+    throw badRequest('Нет данных для обновления')
   }
 
   try {
-    const achievement = await transaction(async client => {
+    const achievement = await transaction(async (client) => {
       const { rows } = await client.query(
         `update achievements
             set code = coalesce($2, code),
@@ -33,28 +33,28 @@ export const PATCH = route(async (request, context) => {
           payload.description || null,
           payload.icon || null,
           payload.condition ? JSON.stringify(payload.condition) : null,
-        ],
-      );
+        ]
+      )
 
-      if (!rows[0]) throw notFound("Достижение не найдено");
-      await evaluateAchievementsForAllUsers(client);
-      return rows[0];
-    });
+      if (!rows[0]) throw notFound('Достижение не найдено')
+      await evaluateAchievementsForAllUsers(client)
+      return rows[0]
+    })
 
-    return json({ achievement });
+    return json({ achievement })
   } catch (error) {
-    if (error.code === "23505") throw badRequest("Достижение с таким кодом уже существует");
-    throw error;
+    if (error.code === '23505') throw badRequest('Достижение с таким кодом уже существует')
+    throw error
   }
-});
+})
 
 export const DELETE = route(async (request, context) => {
-  const user = await requireAuth(request);
-  requireAdmin(user);
-  const { id } = await context.params;
+  const user = await requireAuth(request)
+  requireAdmin(user)
+  const { id } = await context.params
 
-  const { rowCount } = await query("delete from achievements where id = $1", [id]);
-  if (!rowCount) throw notFound("Достижение не найдено");
+  const { rowCount } = await query('delete from achievements where id = $1', [id])
+  if (!rowCount) throw notFound('Достижение не найдено')
 
-  return noContent();
-});
+  return noContent()
+})

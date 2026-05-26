@@ -7,6 +7,9 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier \"src/**/*.{js,jsx,css}\" \"index.html\" \"eslint.config.js\" \"vite.config.js\" \"package.json\" \"README.md\" --write --config ../.prettierrc --ignore-path ../.prettierignore",
+    "format:check": "prettier \"src/**/*.{js,jsx,css}\" \"index.html\" \"eslint.config.js\" \"vite.config.js\" \"package.json\" \"README.md\" --check --config ../.prettierrc --ignore-path ../.prettierignore",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -14,14 +17,17 @@
     "react-dom": "^19.2.5"
   },
   "devDependencies": {
-    "@eslint/js": "^10.0.1",
+    "@eslint/js": "^9.39.4",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",
-    "eslint": "^10.2.1",
+    "eslint": "^9.39.4",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.5.0",
+    "prettier": "^3.8.3",
     "vite": "^8.0.10"
   }
 }

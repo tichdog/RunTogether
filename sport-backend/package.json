@@ -7,6 +7,10 @@
     "dev": "next dev -p 4000",
     "build": "next build",
     "start": "next start -p 4000",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier \"src/**/*.js\" \"middleware.js\" \"next.config.mjs\" \"eslint.config.js\" \"jsconfig.json\" \"package.json\" \"docker-compose.yml\" \"README.md\" --write --config ../.prettierrc --ignore-path ../.prettierignore",
+    "format:check": "prettier \"src/**/*.js\" \"middleware.js\" \"next.config.mjs\" \"eslint.config.js\" \"jsconfig.json\" \"package.json\" \"docker-compose.yml\" \"README.md\" --check --config ../.prettierrc --ignore-path ../.prettierignore",
     "db:schema": "psql \"$DATABASE_URL\" -f src/db/schema.sql",
     "db:seed": "psql \"$DATABASE_URL\" -f src/db/seed.sql",
     "check": "next build"
@@ -21,5 +25,13 @@
   },
   "overrides": {
     "postcss": "^8.5.14"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.4",
+    "eslint": "^9.39.4",
+    "eslint-config-next": "^16.2.6",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^17.6.0",
+    "prettier": "^3.8.3"
   }
 }
