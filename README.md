@@ -11,7 +11,7 @@
 
 - Node.js 20+
 - npm
-- Docker Desktop для PostgreSQL
+- Docker Desktop для PostgreSQL, grafana, loki, promtail
 - PgAdmin, если удобно смотреть БД через интерфейс
 
 ## Быстрый запуск
@@ -43,6 +43,11 @@ Password: postgres
 Создать в PgAdmin новую базу данных, и выполнить 2 SQL файла которые лежат в папке бэка.
 Там находятся запросы для создания таблиц и дефолтных значений.  
 В .env файле укажите имя БД и пароль, а так же порт на котором запущена Бд (обычно 5432)
+
+### 1.3 Запуск docker контейнера для логгера 
+```powershell
+  docker compose up -d
+```
 
 ### 2. Настроить backend
 
