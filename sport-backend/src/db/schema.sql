@@ -205,7 +205,8 @@ insert into system_settings (key, value) values
   ('require_phone_verification', 'false'),
   ('default_participant_limit', '20'),
   ('auto_block_complaints_count', '10'),
-  ('workout_archive_retention_days', '90')
+  ('workout_archive_retention_days', '90'),
+  ('review_window_days', '7')
 on conflict (key) do nothing;
 
 insert into achievements (code, title, description, icon, condition) values

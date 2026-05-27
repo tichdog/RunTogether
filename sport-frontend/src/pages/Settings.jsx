@@ -124,6 +124,16 @@ export function Settings({ currentUser }) {
             />
           </label>
           <label style={numberRow}>
+            <span>Дней на отзыв после тренировки</span>
+            <Input
+              type="number"
+              value={settings.review_window_days}
+              min={1}
+              onChange={(e) => set('review_window_days')(Number(e.target.value))}
+              style={{ width: 90 }}
+            />
+          </label>
+          <label style={numberRow}>
             <span>
               Хранить архив тренировок, дней
               {!isSuperAdmin && (

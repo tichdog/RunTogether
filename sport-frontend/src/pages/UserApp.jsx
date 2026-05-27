@@ -690,16 +690,19 @@ export function UserApp({ user, onLogout }) {
     }
   }
 
-  const saveReview = async (revieweeId, rating) => {
+  const saveReview = async (revieweeId, rating, text = '') => {
     if (!selectedWorkout) return
 
     setSaving(true)
     setMessage(null)
     try {
-      await api.createReview(selectedWorkout.id, { revieweeId, rating })
+      await api.createReview(selectedWorkout.id, { revieweeId, rating, text })
       const data = await api.reviewTargets(selectedWorkout.id)
       setReviewTargets(data.reviewTargets || [])
-      setMessage({ type: 'success', text: 'Оценка сохранена' })
+      setMessage({
+        type: 'success',
+        text: text ? 'Отзыв отправлен организатору' : 'Оценка сохранена',
+      })
     } catch (error) {
       setMessage({ type: 'error', text: error.message })
     } finally {
@@ -1520,39 +1523,55 @@ function UserListItem({ user, label, onOpen, currentUserId }) {
 
 function ReviewPanel({ targets = [], saving, onReview, currentUserId }) {
   const ratedCount = targets.filter((target) => target.review).length
+  const hasPendingReviews = targets.some((target) => !target.review)
+  const canReview = targets.some((target) => target.canReview && !target.review)
+  const expiresAt = targets.find((target) => target.reviewExpiresAt)?.reviewExpiresAt
 
   return (
     <div className="rt-panel">
       <SectionHead
-        title="Оценки"
-        caption={targets.length ? `${ratedCount}/${targets.length} оценено` : 'после тренировки'}
+        title="Отзывы"
+        caption={targets.length ? `${ratedCount}/${targets.length} оставлено` : 'после тренировки'}
       />
       {!targets.length ? (
         <p className="rt-muted">
-          Оценить можно только организатора или подтвержденных участников завершенной тренировки.
+          Оставить отзыв можно только по завершенной тренировке, где вы были организатором или
+          подтвержденным участником.
         </p>
       ) : (
-        <div className="rt-review-list">
-          {targets.map((target) => (
-            <ReviewTarget
-              key={target.user.id}
-              target={target}
-              saving={saving}
-              currentUserId={currentUserId}
-              onReview={(rating) => onReview(target.user.id, rating)}
-            />
-          ))}
-        </div>
+        <>
+          {hasPendingReviews && !canReview && (
+            <p className="rt-muted">
+              {expiresAt
+                ? `Срок для новых отзывов истек ${new Date(expiresAt).toLocaleDateString()}.`
+                : 'Срок для новых отзывов истек.'}
+            </p>
+          )}
+          <div className="rt-review-list">
+            {targets.map((target) => (
+              <ReviewTargetV2
+                key={target.user.id}
+                target={target}
+                saving={saving}
+                currentUserId={currentUserId}
+                onReview={(rating, text) => onReview(target.user.id, rating, text)}
+              />
+            ))}
+          </div>
+        </>
       )}
     </div>
   )
 }
 
-function ReviewTarget({ target, saving, onReview, currentUserId }) {
+function ReviewTargetV2({ target, saving, onReview, currentUserId }) {
   const user = target.user
+  const canReview = Boolean(target.canReview)
 
   return (
-    <article className="rt-review-target">
+    <article
+      className={`rt-review-target ${target.isOrganizer && !target.review ? 'has-form' : ''}`}
+    >
       <Avatar user={user} />
       <div>
         <strong>{user.name}</strong>
@@ -1563,24 +1582,57 @@ function ReviewTarget({ target, saving, onReview, currentUserId }) {
       </div>
       <ReportUserButton user={user} currentUserId={currentUserId} compact />
       {target.review ? (
-        <span className="rt-review-done">{stars(target.review.rating)}</span>
+        <div className="rt-review-result">
+          <span className="rt-review-done">{stars(target.review.rating)}</span>
+          {target.review.text && <p>{target.review.text}</p>}
+        </div>
+      ) : target.isOrganizer ? (
+        <OrganizerReviewForm disabled={saving || !canReview} onReview={onReview} />
       ) : (
-        <StarPicker disabled={saving} onChange={onReview} />
+        <RatingPicker disabled={saving || !canReview} onChange={onReview} />
       )}
     </article>
   )
 }
 
-function StarPicker({ disabled, onChange }) {
+function OrganizerReviewForm({ disabled, onReview }) {
+  const [rating, setRating] = useState(5)
+  const [text, setText] = useState('')
+  const trimmed = text.trim()
+
+  return (
+    <div className="rt-review-form">
+      <RatingPicker disabled={disabled} value={rating} onChange={setRating} />
+      <textarea
+        value={text}
+        onChange={(event) => setText(event.target.value)}
+        maxLength={1000}
+        placeholder="Что было хорошо, что можно улучшить"
+        disabled={disabled}
+      />
+      <button
+        className="rt-primary"
+        type="button"
+        disabled={disabled || !trimmed}
+        onClick={() => onReview(rating, trimmed)}
+      >
+        Отправить отзыв
+      </button>
+    </div>
+  )
+}
+
+function RatingPicker({ disabled, onChange, value = 0 }) {
   return (
     <div className="rt-stars" aria-label="Оценка">
-      {[1, 2, 3, 4, 5].map((value) => (
+      {[1, 2, 3, 4, 5].map((ratingValue) => (
         <button
-          key={value}
+          key={ratingValue}
           type="button"
           disabled={disabled}
-          onClick={() => onChange(value)}
-          aria-label={`${value} из 5`}
+          onClick={() => onChange(ratingValue)}
+          className={Number(value) > 0 && ratingValue <= Number(value) ? 'active' : ''}
+          aria-label={`${ratingValue} из 5`}
         >
           ★
         </button>
@@ -1722,15 +1774,20 @@ function ProfileScreen({
     ['male', 'female'].includes(profile.gender)
 
   return (
-    <section className="rt-page">
+    <section className="rt-page rt-profile-page">
       <div className="rt-profile-head">
-        <Avatar user={user} large />
-        <div>
+        <div className="rt-profile-avatar-wrap">
+          <Avatar user={user} large />
+        </div>
+        <div className="rt-profile-main">
           <h1>{user.name}</h1>
-          <span>{user.email || 'Email скрыт'}</span>
+          <span className="rt-profile-email">{user.email || 'Email скрыт'}</span>
           <label className="rt-avatar-upload">
             <input type="file" accept="image/*" onChange={uploadAvatar} disabled={saving} />
-            <span>{saving ? 'Загрузка...' : 'Загрузить фото'}</span>
+            <span>
+              <Icon name="camera" />
+              {saving ? 'Загрузка...' : 'Загрузить фото'}
+            </span>
           </label>
         </div>
       </div>
@@ -2454,6 +2511,12 @@ function Icon({ name }) {
         <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
         <path d="M16 17l5-5-5-5" />
         <path d="M21 12H9" />
+      </>
+    ),
+    camera: (
+      <>
+        <path d="M14.5 4l1.4 2H19a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h3.1l1.4-2z" />
+        <circle cx="12" cy="13" r="3" />
       </>
     ),
   }
