@@ -47,6 +47,20 @@ Password: postgres
 ### 1.3 Запуск docker контейнера для логгера 
 ```powershell
   docker compose up -d
+  npm run observability:up
+```
+
+Grafana откроется на порту http://localhost:3001
+```powershell
+Логин: admin
+Пароль: admin
+```
+
+
+### 1.4 Запуск Prisma 
+```powershell
+npm run prisma:generate
+npm run db:studio
 ```
 
 ### 2. Настроить backend
