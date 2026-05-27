@@ -1,0 +1,222 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model achievements {
+  id                BigInt              @id @default(autoincrement())
+  code              String              @unique
+  title             String
+  description       String
+  icon              String
+  condition         Json
+  activity_feed     activity_feed[]
+  user_achievements user_achievements[]
+}
+
+model activity_feed {
+  id                                        BigInt        @id @default(autoincrement())
+  type                                      String
+  actor_id                                  BigInt?
+  workout_id                                BigInt?
+  target_user_id                            BigInt?
+  achievement_id                            BigInt?
+  metadata                                  Json          @default("{}")
+  created_at                                DateTime      @default(now()) @db.Timestamptz(6)
+  achievements                              achievements? @relation(fields: [achievement_id], references: [id], onUpdate: NoAction)
+  users_activity_feed_actor_idTousers       users?        @relation("activity_feed_actor_idTousers", fields: [actor_id], references: [id], onUpdate: NoAction)
+  users_activity_feed_target_user_idTousers users?        @relation("activity_feed_target_user_idTousers", fields: [target_user_id], references: [id], onUpdate: NoAction)
+  workouts                                  workouts?     @relation(fields: [workout_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model auth_sessions {
+  id                 String    @id @db.Uuid
+  user_id            BigInt
+  access_jti         String    @unique
+  refresh_token_hash String    @unique
+  user_agent         String?
+  ip_address         String?
+  expires_at         DateTime  @db.Timestamptz(6)
+  revoked_at         DateTime? @db.Timestamptz(6)
+  last_used_at       DateTime? @db.Timestamptz(6)
+  created_at         DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime  @default(now()) @db.Timestamptz(6)
+  users              users     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([user_id, revoked_at, expires_at], map: "idx_auth_sessions_active")
+  @@index([refresh_token_hash], map: "idx_auth_sessions_refresh_hash")
+  @@index([user_id], map: "idx_auth_sessions_user")
+}
+
+model notifications {
+  id            BigInt    @id @default(autoincrement())
+  user_id       BigInt
+  type          String
+  title         String
+  message       String
+  payload       Json      @default("{}")
+  scheduled_for DateTime? @db.Timestamptz(6)
+  delivered_at  DateTime? @db.Timestamptz(6)
+  read_at       DateTime? @db.Timestamptz(6)
+  created_at    DateTime  @default(now()) @db.Timestamptz(6)
+  users         users     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([user_id, read_at], map: "idx_notifications_user_read")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model reports {
+  id                                    BigInt          @id @default(autoincrement())
+  reporter_id                           BigInt
+  reported_user_id                      BigInt
+  reason                                String
+  details                               String?
+  status                                String          @default("open")
+  moderator_id                          BigInt?
+  created_at                            DateTime        @default(now()) @db.Timestamptz(6)
+  resolved_at                           DateTime?       @db.Timestamptz(6)
+  resolution_action                     String?
+  moderator_comment                     String?
+  ban_until                             DateTime?       @db.Timestamptz(6)
+  updated_at                            DateTime        @default(now()) @db.Timestamptz(6)
+  users_reports_moderator_idTousers     users?          @relation("reports_moderator_idTousers", fields: [moderator_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users_reports_reported_user_idTousers users           @relation("reports_reported_user_idTousers", fields: [reported_user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users_reports_reporter_idTousers      users           @relation("reports_reporter_idTousers", fields: [reporter_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  user_warnings                         user_warnings[]
+
+  @@index([status], map: "idx_reports_status")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model reviews {
+  id                               BigInt   @id @default(autoincrement())
+  workout_id                       BigInt
+  reviewer_id                      BigInt
+  reviewee_id                      BigInt
+  rating                           Int
+  text                             String?
+  created_at                       DateTime @default(now()) @db.Timestamptz(6)
+  users_reviews_reviewee_idTousers users    @relation("reviews_reviewee_idTousers", fields: [reviewee_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users_reviews_reviewer_idTousers users    @relation("reviews_reviewer_idTousers", fields: [reviewer_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  workouts                         workouts @relation(fields: [workout_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([workout_id, reviewer_id, reviewee_id])
+}
+
+model system_settings {
+  key        String   @id
+  value      Json
+  updated_at DateTime @default(now()) @db.Timestamptz(6)
+}
+
+model user_achievements {
+  user_id        BigInt
+  achievement_id BigInt
+  earned_at      DateTime     @default(now()) @db.Timestamptz(6)
+  achievements   achievements @relation(fields: [achievement_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users          users        @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([user_id, achievement_id])
+}
+
+model user_warnings {
+  id                                      BigInt   @id @default(autoincrement())
+  user_id                                 BigInt
+  moderator_id                            BigInt?
+  report_id                               BigInt?
+  reason                                  String
+  comment                                 String?
+  created_at                              DateTime @default(now()) @db.Timestamptz(6)
+  users_user_warnings_moderator_idTousers users?   @relation("user_warnings_moderator_idTousers", fields: [moderator_id], references: [id], onUpdate: NoAction)
+  reports                                 reports? @relation(fields: [report_id], references: [id], onUpdate: NoAction)
+  users_user_warnings_user_idTousers      users    @relation("user_warnings_user_idTousers", fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model users {
+  id                                                BigInt                 @id @default(autoincrement())
+  email                                             String?                @unique
+  phone                                             String?                @unique
+  password_hash                                     String
+  first_name                                        String?
+  last_name                                         String?
+  gender                                            String?
+  full_name                                         String
+  avatar_url                                        String?
+  role                                              String                 @default("member")
+  account_status                                    String                 @default("active")
+  phone_verified                                    Boolean                @default(false)
+  email_verified                                    Boolean                @default(false)
+  verification_status                               String                 @default("unverified")
+  privacy_settings                                  Json                   @default("{\"hide_email\": false, \"hide_phone\": false}")
+  created_at                                        DateTime               @default(now()) @db.Timestamptz(6)
+  updated_at                                        DateTime               @default(now()) @db.Timestamptz(6)
+  warning_count                                     Int                    @default(0)
+  blocked_until                                     DateTime?              @db.Timestamptz(6)
+  block_reason                                      String?
+  activity_feed_activity_feed_actor_idTousers       activity_feed[]        @relation("activity_feed_actor_idTousers")
+  activity_feed_activity_feed_target_user_idTousers activity_feed[]        @relation("activity_feed_target_user_idTousers")
+  auth_sessions                                     auth_sessions[]
+  notifications                                     notifications[]
+  reports_reports_moderator_idTousers               reports[]              @relation("reports_moderator_idTousers")
+  reports_reports_reported_user_idTousers           reports[]              @relation("reports_reported_user_idTousers")
+  reports_reports_reporter_idTousers                reports[]              @relation("reports_reporter_idTousers")
+  reviews_reviews_reviewee_idTousers                reviews[]              @relation("reviews_reviewee_idTousers")
+  reviews_reviews_reviewer_idTousers                reviews[]              @relation("reviews_reviewer_idTousers")
+  user_achievements                                 user_achievements[]
+  user_warnings_user_warnings_moderator_idTousers   user_warnings[]        @relation("user_warnings_moderator_idTousers")
+  user_warnings_user_warnings_user_idTousers        user_warnings[]        @relation("user_warnings_user_idTousers")
+  workout_participants                              workout_participants[]
+  workouts                                          workouts[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model workout_participants {
+  id           BigInt    @id @default(autoincrement())
+  workout_id   BigInt
+  user_id      BigInt
+  status       String    @default("pending")
+  requested_at DateTime  @default(now()) @db.Timestamptz(6)
+  responded_at DateTime? @db.Timestamptz(6)
+  users        users     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  workouts     workouts  @relation(fields: [workout_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([workout_id, user_id])
+  @@index([user_id], map: "idx_workout_participants_user")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model workouts {
+  id                    BigInt                 @id @default(autoincrement())
+  organizer_id          BigInt
+  title                 String
+  description           String?
+  start_at              DateTime               @db.Timestamptz(6)
+  duration_minutes      Int                    @default(60)
+  meeting_point_name    String
+  meeting_point_address String?
+  meeting_lat           Decimal?               @db.Decimal(9, 6)
+  meeting_lng           Decimal?               @db.Decimal(9, 6)
+  route_name            String
+  route_geojson         Json?
+  distance_km           Decimal                @db.Decimal(7, 2)
+  pace_min_per_km       Decimal                @db.Decimal(4, 2)
+  difficulty            String
+  participant_limit     Int
+  status                String                 @default("open")
+  cancellation_reason   String?
+  cancelled_at          DateTime?              @db.Timestamptz(6)
+  created_at            DateTime               @default(now()) @db.Timestamptz(6)
+  updated_at            DateTime               @default(now()) @db.Timestamptz(6)
+  activity_feed         activity_feed[]
+  reviews               reviews[]
+  workout_participants  workout_participants[]
+  users                 users                  @relation(fields: [organizer_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([start_at], map: "idx_workouts_start_at")
+  @@index([status], map: "idx_workouts_status")
+}

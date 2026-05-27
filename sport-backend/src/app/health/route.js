@@ -1,5 +1,5 @@
-import { json } from "@/lib/server/response";
+import { json, route } from '@/lib/server/response'
 
-export function GET() {
-  return json({ ok: true });
-}
+export const GET = route(async () => {
+  return json({ ok: true })
+})

@@ -1,144 +1,141 @@
-import { requireAuth } from "@/lib/server/auth";
-import { query, transaction } from "@/lib/server/db";
-import { badRequest, forbidden } from "@/lib/server/http-error";
-import { publicUser } from "@/lib/mappers/user";
-import { json, readJson, route } from "@/lib/server/response";
-import { evaluateAchievements } from "@/lib/services/achievements";
-import { syncWorkoutStatus } from "@/lib/services/workouts";
+import { requireAuth } from '@/lib/server/auth'
+import { dbId, prisma } from '@/lib/server/db'
+import { badRequest, forbidden } from '@/lib/server/http-error'
+import { publicUser } from '@/lib/mappers/user'
+import { json, readJson, route } from '@/lib/server/response'
+import { attachUserProfiles } from '@/lib/repositories/users'
+import { evaluateAchievements } from '@/lib/services/achievements'
+import { syncWorkoutStatus } from '@/lib/services/workouts'
+
+function isWorkoutMember(workout, userId) {
+  return (
+    Number(workout.organizer_id) === Number(userId) ||
+    workout.workout_participants.some(
+      (participant) =>
+        Number(participant.user_id) === Number(userId) && participant.status === 'confirmed'
+    )
+  )
+}
 
 export const GET = route(async (request, context) => {
-  const user = await requireAuth(request);
-  const { id } = await context.params;
-  await syncWorkoutStatus(query, id);
+  const user = await requireAuth(request)
+  const { id } = await context.params
+  await syncWorkoutStatus(prisma, id)
 
-  const { rows: eligible } = await query(
-    `select 1
-       from workouts w
-      where w.id = $1
-        and w.status = 'completed'
-        and (
-          w.organizer_id = $2
-          or exists (
-            select 1
-              from workout_participants wp
-             where wp.workout_id = w.id
-               and wp.user_id = $2
-               and wp.status = 'confirmed'
-          )
-        )`,
-    [id, user.id],
-  );
+  const workout = await prisma.workouts.findUnique({
+    where: { id: dbId(id) },
+    include: {
+      users: true,
+      workout_participants: {
+        where: { status: 'confirmed' },
+        include: { users: true },
+      },
+      reviews: {
+        where: { reviewer_id: dbId(user.id) },
+      },
+    },
+  })
 
-  if (!eligible[0]) {
-    return json({ reviewTargets: [] });
+  if (
+    !workout ||
+    !['completed', 'archived'].includes(workout.status) ||
+    !isWorkoutMember(workout, user.id)
+  ) {
+    return json({ reviewTargets: [] })
   }
 
-  const { rows } = await query(
-    `with target_users as (
-       select w.organizer_id as id, true as is_organizer
-         from workouts w
-        where w.id = $1
-       union
-       select wp.user_id as id, false as is_organizer
-         from workout_participants wp
-        where wp.workout_id = $1 and wp.status = 'confirmed'
-     )
-     select u.*, s.organized_workouts, s.attended_workouts, s.total_distance_km,
-            s.average_rating, s.complaints_count,
-            (u.privacy_settings->>'hide_email')::boolean as hide_email,
-            (u.privacy_settings->>'hide_phone')::boolean as hide_phone,
-            tu.is_organizer,
-            my_review.id as my_review_id,
-            my_review.rating as my_review_rating,
-            my_review.text as my_review_text
-       from users u
-       join target_users tu on tu.id = u.id
-       left join user_training_stats s on s.user_id = u.id
-     left join reviews my_review
-       on my_review.workout_id = $1
-      and my_review.reviewer_id = $2
-      and my_review.reviewee_id = u.id
-     where u.id <> $2
-     order by tu.is_organizer desc, u.full_name`,
-    [id, user.id],
-  );
+  const targets = [
+    { user: workout.users, isOrganizer: true },
+    ...workout.workout_participants.map((participant) => ({
+      user: participant.users,
+      isOrganizer: false,
+    })),
+  ].filter((target) => Number(target.user.id) !== Number(user.id))
+  const profiles = await attachUserProfiles(targets.map((target) => target.user))
+  const profilesById = new Map(profiles.map((profile) => [profile.id.toString(), profile]))
 
   return json({
-    reviewTargets: rows.map(row => ({
-      user: publicUser(row, { viewer: user }),
-      isOrganizer: Boolean(row.is_organizer),
-      review: row.my_review_id
-        ? { id: row.my_review_id, rating: Number(row.my_review_rating), text: row.my_review_text }
-        : null,
-    })),
-  });
-});
+    reviewTargets: targets.map((target) => {
+      const review = workout.reviews.find(
+        (item) => Number(item.reviewee_id) === Number(target.user.id)
+      )
+      return {
+        user: publicUser(profilesById.get(target.user.id.toString()), { viewer: user }),
+        isOrganizer: target.isOrganizer,
+        review: review ? { id: review.id, rating: Number(review.rating), text: review.text } : null,
+      }
+    }),
+  })
+})
 
 export const POST = route(async (request, context) => {
-  const user = await requireAuth(request);
-  const { id } = await context.params;
-  await syncWorkoutStatus(query, id);
+  const user = await requireAuth(request)
+  const { id } = await context.params
+  await syncWorkoutStatus(prisma, id)
 
-  const body = await readJson(request);
-  const rating = Number(body.rating);
-  const revieweeId = Number(body.revieweeId || body.reviewee_id);
+  const body = await readJson(request)
+  const rating = Number(body.rating)
+  const revieweeId = Number(body.revieweeId || body.reviewee_id)
   if (!revieweeId || !Number.isInteger(rating) || rating < 1 || rating > 5) {
-    throw badRequest("Укажите пользователя и оценку 1-5");
+    throw badRequest('РЈРєР°Р¶РёС‚Рµ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ Рё РѕС†РµРЅРєСѓ 1-5')
   }
   if (Number(user.id) === revieweeId) {
-    throw badRequest("Нельзя оценить самого себя");
+    throw badRequest('РќРµР»СЊР·СЏ РѕС†РµРЅРёС‚СЊ СЃР°РјРѕРіРѕ СЃРµР±СЏ')
   }
 
-  const review = await transaction(async client => {
-    const { rows: eligibility } = await client.query(
-      `select w.id,
-              w.organizer_id = $2 as reviewer_is_organizer,
-              w.organizer_id = $3 as reviewee_is_organizer,
-              exists (
-                select 1
-                  from workout_participants wp
-                 where wp.workout_id = w.id
-                   and wp.user_id = $2
-                   and wp.status = 'confirmed'
-              ) as reviewer_is_participant,
-              exists (
-                select 1
-                  from workout_participants wp
-                 where wp.workout_id = w.id
-                   and wp.user_id = $3
-                   and wp.status = 'confirmed'
-              ) as reviewee_is_participant
-         from workouts w
-        where w.id = $1 and w.status = 'completed'`,
-      [id, user.id, revieweeId],
-    );
+  const review = await prisma.$transaction(async (tx) => {
+    const workout = await tx.workouts.findUnique({
+      where: { id: dbId(id) },
+      include: {
+        workout_participants: {
+          where: { status: 'confirmed' },
+          select: { user_id: true },
+        },
+      },
+    })
 
-    const rules = eligibility[0];
-    const reviewerAllowed = rules?.reviewer_is_organizer || rules?.reviewer_is_participant;
-    const revieweeAllowed = rules?.reviewee_is_organizer || rules?.reviewee_is_participant;
+    const reviewerAllowed =
+      workout &&
+      ['completed', 'archived'].includes(workout.status) &&
+      (Number(workout.organizer_id) === Number(user.id) ||
+        workout.workout_participants.some((row) => Number(row.user_id) === Number(user.id)))
+    const revieweeAllowed =
+      workout &&
+      (Number(workout.organizer_id) === revieweeId ||
+        workout.workout_participants.some((row) => Number(row.user_id) === revieweeId))
+
     if (!reviewerAllowed || !revieweeAllowed) {
-      throw forbidden("Оценивать можно только тех, с кем вы были на завершенной тренировке");
+      throw forbidden(
+        'РћС†РµРЅРёРІР°С‚СЊ РјРѕР¶РЅРѕ С‚РѕР»СЊРєРѕ С‚РµС…, СЃ РєРµРј РІС‹ Р±С‹Р»Рё РЅР° Р·Р°РІРµСЂС€РµРЅРЅРѕР№ С‚СЂРµРЅРёСЂРѕРІРєРµ'
+      )
     }
 
-    const { rows: existing } = await client.query(
-      `select id
-         from reviews
-        where workout_id = $1 and reviewer_id = $2 and reviewee_id = $3`,
-      [id, user.id, revieweeId],
-    );
-    if (existing[0]) {
-      throw badRequest("Этого пользователя вы уже оценили после этой тренировки");
+    const existing = await tx.reviews.findFirst({
+      where: {
+        workout_id: dbId(id),
+        reviewer_id: dbId(user.id),
+        reviewee_id: dbId(revieweeId),
+      },
+      select: { id: true },
+    })
+    if (existing) {
+      throw badRequest(
+        'Р­С‚РѕРіРѕ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ РІС‹ СѓР¶Рµ РѕС†РµРЅРёР»Рё РїРѕСЃР»Рµ СЌС‚РѕР№ С‚СЂРµРЅРёСЂРѕРІРєРё'
+      )
     }
 
-    const { rows } = await client.query(
-      `insert into reviews (workout_id, reviewer_id, reviewee_id, rating, text)
-       values ($1, $2, $3, $4, $5)
-       returning *`,
-      [id, user.id, revieweeId, rating, body.text || null],
-    );
-    await evaluateAchievements(client, revieweeId);
-    return rows[0];
-  });
+    const row = await tx.reviews.create({
+      data: {
+        workout_id: dbId(id),
+        reviewer_id: dbId(user.id),
+        reviewee_id: dbId(revieweeId),
+        rating,
+        text: body.text || null,
+      },
+    })
+    await evaluateAchievements(tx, revieweeId)
+    return row
+  })
 
-  return json({ review }, 201);
-});
+  return json({ review }, 201)
+})

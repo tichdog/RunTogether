@@ -1,142 +1,139 @@
-import { requireAuth } from "@/lib/server/auth";
-import { query } from "@/lib/server/db";
-import { forbidden } from "@/lib/server/http-error";
-import { json, readJson, route } from "@/lib/server/response";
-import { getSettings } from "@/lib/services/settings";
-import { parseWorkoutBody } from "@/lib/repositories/workouts";
-import { syncWorkoutStatus, workoutPayload } from "@/lib/services/workouts";
+import { requireAuth } from '@/lib/server/auth'
+import { dbId, prisma } from '@/lib/server/db'
+import { forbidden } from '@/lib/server/http-error'
+import { json, readJson, route } from '@/lib/server/response'
+import { getSettings } from '@/lib/services/settings'
+import { parseWorkoutBody } from '@/lib/repositories/workouts'
+import {
+  buildWorkoutRows,
+  syncWorkoutStatus,
+  workoutInclude,
+  workoutPayload,
+} from '@/lib/services/workouts'
 
-export const GET = route(async request => {
-  const user = await requireAuth(request);
-  const { searchParams } = new URL(request.url);
-  const lat = searchParams.get("lat") == null ? null : Number(searchParams.get("lat"));
-  const lng = searchParams.get("lng") == null ? null : Number(searchParams.get("lng"));
-  const hasGeo = Number.isFinite(lat) && Number.isFinite(lng);
-  const radiusKm = hasGeo && searchParams.get("radiusKm") != null ? Number(searchParams.get("radiusKm")) : null;
-  const sort = searchParams.get("sort") === "distance" && hasGeo ? "distance" : "time";
-
-  const distanceExpr = hasGeo
-    ? `(6371 * acos(least(1, greatest(-1,
-         cos(radians($8::numeric)) * cos(radians(w.meeting_lat)) *
-         cos(radians(w.meeting_lng) - radians($9::numeric)) +
-         sin(radians($8::numeric)) * sin(radians(w.meeting_lat))
-       ))))`
-    : "null";
-
-  const params = [
-    searchParams.get("dateFrom") || null,
-    searchParams.get("dateTo") || null,
-    searchParams.get("distanceMin") || null,
-    searchParams.get("distanceMax") || null,
-    searchParams.get("paceMax") || null,
-    searchParams.get("difficulty") || null,
-    radiusKm,
-  ];
-
-  if (hasGeo) {
-    params.push(lat, lng);
-  }
-  const currentUserParam = params.length + 1;
-  params.push(user.id);
-
-  const { rows } = await query(
-    `select w.*, u.full_name as organizer_name,
-            jsonb_build_object(
-              'id', u.id,
-              'name', u.full_name,
-              'initials', upper(left(coalesce(u.first_name, u.full_name, u.email, 'U'), 1) || left(coalesce(u.last_name, ''), 1)),
-              'avatarUrl', u.avatar_url,
-              'role', u.role,
-              'stats', jsonb_build_object('rating', os.average_rating)
-            ) as organizer,
-            coalesce((
-              select jsonb_agg(jsonb_build_object(
-                'id', pu.id,
-                'name', pu.full_name,
-                'initials', upper(left(coalesce(pu.first_name, pu.full_name, pu.email, 'U'), 1) || left(coalesce(pu.last_name, ''), 1)),
-                'avatarUrl', pu.avatar_url,
-                'role', pu.role,
-                'stats', jsonb_build_object('rating', ps.average_rating)
-              ) order by pu.full_name)
-                from workout_participants pwp
-                join users pu on pu.id = pwp.user_id
-                left join user_training_stats ps on ps.user_id = pu.id
-               where pwp.workout_id = w.id and pwp.status = 'confirmed'
-            ), '[]'::jsonb) as participants,
-            count(wp.id) filter (where wp.status = 'confirmed') as confirmed_count,
-            my_wp.status as participant_status,
-            my_wp.id as participant_request_id,
-            ${distanceExpr} as distance_from_user_km
-       from workouts w
-       join users u on u.id = w.organizer_id
-       left join user_training_stats os on os.user_id = u.id
-       left join workout_participants wp on wp.workout_id = w.id
-       left join workout_participants my_wp on my_wp.workout_id = w.id and my_wp.user_id = $${currentUserParam}
-      where ($1::timestamptz is null or w.start_at >= $1)
-        and ($2::timestamptz is null or w.start_at <= $2)
-        and ($3::numeric is null or w.distance_km >= $3)
-        and ($4::numeric is null or w.distance_km <= $4)
-        and ($5::numeric is null or w.pace_min_per_km <= $5)
-        and ($6::text is null or w.difficulty = $6)
-        and ($7::numeric is null or ${distanceExpr} <= $7)
-      group by w.id, u.id, os.average_rating, my_wp.status, my_wp.id
-      order by ${sort === "distance"
-        ? "distance_from_user_km nulls last, w.start_at"
-        : "case when w.status in ('completed', 'cancelled') or now() >= w.start_at + (w.duration_minutes || ' minutes')::interval then 1 else 0 end, w.start_at"}
-      limit 100`,
-    params,
-  );
-
-  const syncedRows = await Promise.all(rows.map(async row => {
-    const synced = await syncWorkoutStatus(query, row.id);
-    return synced ? { ...row, status: synced.status, updated_at: synced.updated_at } : row;
-  }));
-  return json({ workouts: syncedRows.map(workoutPayload) });
-});
-
-export const POST = route(async request => {
-  const user = await requireAuth(request);
-  const settings = await getSettings();
-  if (settings.require_verified_to_create_workouts && !user.phone_verified) {
-    throw forbidden("Создание тренировок доступно только пользователям с подтвержденным телефоном");
-  }
-
-  const data = parseWorkoutBody(await readJson(request));
-  const { rows } = await query(
-    `insert into workouts (
-      organizer_id, title, description, start_at, duration_minutes, meeting_point_name,
-      meeting_point_address, meeting_lat, meeting_lng, route_name, route_geojson,
-      distance_km, pace_min_per_km, difficulty, participant_limit, status
+function filterArchive(row, archiveOnly, includeArchived) {
+  if (archiveOnly) {
+    return (
+      row.status === 'archived' ||
+      (row.status !== 'cancelled' &&
+        Date.now() >=
+          new Date(row.start_at).getTime() + (Number(row.duration_minutes) + 1440) * 60_000)
     )
-    values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,$12,$13,$14,$15,'open')
-    returning *`,
-    [
-      user.id,
-      data.title,
-      data.description,
-      data.startAt,
-      data.durationMinutes,
-      data.meetingPoint.name,
-      data.meetingPoint.address || null,
-      data.meetingPoint.lat || null,
-      data.meetingPoint.lng || null,
-      data.route.name,
-      JSON.stringify(data.route.geojson || null),
-      data.distanceKm,
-      data.paceMinPerKm,
-      data.difficulty,
-      data.participantLimit,
-    ],
-  );
+  }
+  return includeArchived || row.status !== 'archived'
+}
 
-  await query(
-    `insert into activity_feed (type, actor_id, workout_id, metadata)
-     values ('workout_created', $1, $2, $3::jsonb)`,
-    [user.id, rows[0].id, JSON.stringify({ title: rows[0].title })],
-  );
+export const GET = route(async (request) => {
+  const user = await requireAuth(request)
+  const { searchParams } = new URL(request.url)
+  const lat = searchParams.get('lat') == null ? null : Number(searchParams.get('lat'))
+  const lng = searchParams.get('lng') == null ? null : Number(searchParams.get('lng'))
+  const hasGeo = Number.isFinite(lat) && Number.isFinite(lng)
+  const radiusKm =
+    hasGeo && searchParams.get('radiusKm') != null ? Number(searchParams.get('radiusKm')) : null
+  const sort = searchParams.get('sort') === 'distance' && hasGeo ? 'distance' : 'time'
+  const archiveOnly =
+    searchParams.get('archiveOnly') === 'true' || searchParams.get('archive') === 'only'
+  const includeArchived =
+    archiveOnly ||
+    searchParams.get('archive') === '1' ||
+    searchParams.get('includeArchived') === 'true'
+  const startAt = {
+    ...(searchParams.get('dateFrom') ? { gte: new Date(searchParams.get('dateFrom')) } : {}),
+    ...(searchParams.get('dateTo') ? { lte: new Date(searchParams.get('dateTo')) } : {}),
+  }
+  const distanceKm = {
+    ...(searchParams.get('distanceMin') ? { gte: Number(searchParams.get('distanceMin')) } : {}),
+    ...(searchParams.get('distanceMax') ? { lte: Number(searchParams.get('distanceMax')) } : {}),
+  }
 
-  return json(
-    { workout: workoutPayload({ ...rows[0], organizer_name: user.full_name, confirmed_count: 0 }) },
-    201,
-  );
-});
+  const workouts = await prisma.workouts.findMany({
+    where: {
+      ...(Object.keys(startAt).length ? { start_at: startAt } : {}),
+      ...(Object.keys(distanceKm).length ? { distance_km: distanceKm } : {}),
+      ...(searchParams.get('paceMax')
+        ? { pace_min_per_km: { lte: Number(searchParams.get('paceMax')) } }
+        : {}),
+      ...(searchParams.get('difficulty') ? { difficulty: searchParams.get('difficulty') } : {}),
+      ...(includeArchived || archiveOnly ? {} : { status: { not: 'archived' } }),
+    },
+    include: workoutInclude,
+    orderBy: [{ created_at: 'desc' }, { start_at: 'desc' }],
+    take: 300,
+  })
+
+  const synced = []
+  for (const row of workouts) {
+    const status = await syncWorkoutStatus(prisma, row.id)
+    synced.push({
+      ...row,
+      status: status?.status || row.status,
+      updated_at: status?.updated_at || row.updated_at,
+    })
+  }
+
+  let rows = await buildWorkoutRows(synced, user, { lat, lng })
+  rows = rows.filter((row) => filterArchive(row, archiveOnly, includeArchived))
+  if (radiusKm != null) {
+    rows = rows.filter(
+      (row) => row.distance_from_user_km != null && row.distance_from_user_km <= radiusKm
+    )
+  }
+  if (sort === 'distance') {
+    rows.sort(
+      (a, b) =>
+        (a.distance_from_user_km ?? Number.POSITIVE_INFINITY) -
+          (b.distance_from_user_km ?? Number.POSITIVE_INFINITY) ||
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    )
+  }
+
+  return json({ workouts: rows.slice(0, 100).map((row) => workoutPayload(row, user)) })
+})
+
+export const POST = route(async (request) => {
+  const user = await requireAuth(request)
+  const settings = await getSettings()
+  if (settings.require_verified_to_create_workouts && !user.phone_verified) {
+    throw forbidden(
+      'РЎРѕР·РґР°РЅРёРµ С‚СЂРµРЅРёСЂРѕРІРѕРє РґРѕСЃС‚СѓРїРЅРѕ С‚РѕР»СЊРєРѕ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏРј СЃ РїРѕРґС‚РІРµСЂР¶РґРµРЅРЅС‹Рј С‚РµР»РµС„РѕРЅРѕРј'
+    )
+  }
+
+  const data = parseWorkoutBody(await readJson(request))
+  const workout = await prisma.$transaction(async (tx) => {
+    const created = await tx.workouts.create({
+      data: {
+        organizer_id: dbId(user.id),
+        title: data.title,
+        description: data.description,
+        start_at: new Date(data.startAt),
+        duration_minutes: data.durationMinutes,
+        meeting_point_name: data.meetingPoint.name,
+        meeting_point_address: data.meetingPoint.address || null,
+        meeting_lat: data.meetingPoint.lat || null,
+        meeting_lng: data.meetingPoint.lng || null,
+        route_name: data.route.name,
+        route_geojson: data.route.geojson || null,
+        distance_km: data.distanceKm,
+        pace_min_per_km: data.paceMinPerKm,
+        difficulty: data.difficulty,
+        participant_limit: data.participantLimit,
+        status: 'open',
+      },
+      include: workoutInclude,
+    })
+    await tx.activity_feed.create({
+      data: {
+        type: 'workout_created',
+        actor_id: dbId(user.id),
+        workout_id: created.id,
+        metadata: { title: created.title },
+      },
+    })
+    return created
+  })
+
+  const [row] = await buildWorkoutRows([workout], user)
+  return json({ workout: workoutPayload(row, user) }, 201)
+})

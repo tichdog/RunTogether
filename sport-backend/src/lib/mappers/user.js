@@ -1,21 +1,21 @@
-const ADMIN_ROLES = new Set(["admin", "super_admin"]);
+const ADMIN_ROLES = new Set(['admin', 'super_admin'])
 
 function canViewPrivateContacts(row, viewer) {
-  if (!viewer) return false;
-  return ADMIN_ROLES.has(viewer.role) || Number(row.id) === Number(viewer.id);
+  if (!viewer) return false
+  return ADMIN_ROLES.has(viewer.role) || Number(row.id) === Number(viewer.id)
 }
 
 export function publicUser(row, { viewer } = {}) {
-  if (!row) return null;
-  const hideEmail = Boolean(row.hide_email ?? row.privacy_settings?.hide_email);
-  const hidePhone = Boolean(row.hide_phone ?? row.privacy_settings?.hide_phone);
-  const revealPrivateContacts = canViewPrivateContacts(row, viewer);
-  const initials = (row.full_name || row.email || "U")
-    .split(" ")
+  if (!row) return null
+  const hideEmail = Boolean(row.hide_email ?? row.privacy_settings?.hide_email)
+  const hidePhone = Boolean(row.hide_phone ?? row.privacy_settings?.hide_phone)
+  const revealPrivateContacts = canViewPrivateContacts(row, viewer)
+  const initials = (row.full_name || row.email || 'U')
+    .split(' ')
     .filter(Boolean)
     .slice(0, 2)
-    .map(part => part[0]?.toUpperCase())
-    .join("");
+    .map((part) => part[0]?.toUpperCase())
+    .join('')
 
   return {
     id: row.id,
@@ -47,5 +47,5 @@ export function publicUser(row, { viewer } = {}) {
       rating: row.average_rating ? Number(row.average_rating) : null,
       complaints: Number(row.complaints_count || 0),
     },
-  };
+  }
 }

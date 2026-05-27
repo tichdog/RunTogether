@@ -1,45 +1,76 @@
-import { pool, query } from "../server/db";
-import { createNotification } from "../services/notifications";
-import { syncWorkoutStatus } from "../services/workouts";
+import { prisma } from '../server/db'
+import { createNotification } from '../services/notifications'
+import { getSettings } from '../services/settings'
+import { syncWorkoutStatus } from '../services/workouts'
 
 export async function createReminderNotifications() {
-  const { rows } = await query(
-    `select w.id, w.title, w.start_at, wp.user_id
-       from workouts w
-       join workout_participants wp on wp.workout_id = w.id and wp.status = 'confirmed'
-      where w.status in ('open', 'full')
-        and w.start_at between now() and now() + interval '24 hours'
-        and not exists (
-          select 1 from notifications n
-           where n.user_id = wp.user_id
-             and n.type = 'workout_reminder'
-             and n.payload->>'workoutId' = w.id::text
-             and n.payload->>'window' = case
-               when w.start_at <= now() + interval '1 hour' then '1h'
-               else '24h'
-             end
-        )`,
-  );
+  const now = new Date()
+  const dayAhead = new Date(now.getTime() + 24 * 60 * 60 * 1000)
+  const hourAhead = new Date(now.getTime() + 60 * 60 * 1000)
+  const workouts = await prisma.workouts.findMany({
+    where: {
+      status: { in: ['open', 'full'] },
+      start_at: { gte: now, lte: dayAhead },
+    },
+    include: {
+      workout_participants: {
+        where: { status: 'confirmed' },
+        select: { user_id: true },
+      },
+    },
+  })
 
-  for (const row of rows) {
-    const window = new Date(row.start_at).getTime() <= Date.now() + 60 * 60 * 1000 ? "1h" : "24h";
-    await createNotification(pool, {
-      userId: row.user_id,
-      type: "workout_reminder",
-      title: window === "1h" ? "Тренировка через час" : "Тренировка завтра",
-      message: row.title,
-      payload: { workoutId: row.id, window },
-      scheduledFor: row.start_at,
-    });
+  let created = 0
+  for (const workout of workouts) {
+    const window = new Date(workout.start_at).getTime() <= hourAhead.getTime() ? '1h' : '24h'
+    for (const participant of workout.workout_participants) {
+      const existing = await prisma.notifications.findFirst({
+        where: {
+          user_id: participant.user_id,
+          type: 'workout_reminder',
+          payload: {
+            path: ['workoutId'],
+            equals: workout.id.toString(),
+          },
+        },
+      })
+      if (existing?.payload?.window === window) continue
+
+      await createNotification(prisma, {
+        userId: participant.user_id,
+        type: 'workout_reminder',
+        title: window === '1h' ? 'Тренировка через час' : 'Тренировка завтра',
+        message: workout.title,
+        payload: { workoutId: workout.id, window },
+        scheduledFor: workout.start_at,
+      })
+      created += 1
+    }
   }
 
-  return rows.length;
+  return created
 }
 
 export async function syncActiveWorkoutStatuses() {
-  const { rows } = await query("select id from workouts where status not in ('cancelled', 'completed')");
-  for (const row of rows) {
-    await syncWorkoutStatus(pool, row.id);
+  const workouts = await prisma.workouts.findMany({
+    where: { status: { notIn: ['cancelled', 'archived'] } },
+    select: { id: true },
+  })
+  for (const row of workouts) {
+    await syncWorkoutStatus(prisma, row.id)
   }
-  return rows.length;
+  return workouts.length
+}
+
+export async function deleteExpiredArchivedWorkouts() {
+  const settings = await getSettings()
+  const retentionDays = Math.max(1, Number(settings.workout_archive_retention_days) || 90)
+  const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000)
+  const result = await prisma.workouts.deleteMany({
+    where: {
+      status: 'archived',
+      updated_at: { lt: cutoff },
+    },
+  })
+  return result.count
 }

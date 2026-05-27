@@ -1,33 +1,30 @@
-import pg from "pg";
-import { env } from "./env";
+import { PrismaPg } from '@prisma/adapter-pg'
+import { PrismaClient } from '../../generated/prisma/client.ts'
+import { env } from './env'
 
-const globalForPg = globalThis;
+const globalForPrisma = globalThis
 
-export const pool =
-  globalForPg.sportPgPool ||
-  new pg.Pool({
+const adapter =
+  globalForPrisma.sportPrismaAdapter ||
+  new PrismaPg({
     connectionString: env.databaseUrl,
-  });
+  })
 
-if (env.nodeEnv !== "production") {
-  globalForPg.sportPgPool = pool;
+export const prisma =
+  globalForPrisma.sportPrisma ||
+  new PrismaClient({
+    adapter,
+  })
+
+if (env.nodeEnv !== 'production') {
+  globalForPrisma.sportPrismaAdapter = adapter
+  globalForPrisma.sportPrisma = prisma
 }
 
-export async function query(text, params = []) {
-  return pool.query(text, params);
+export function dbId(value) {
+  return typeof value === 'bigint' ? value : BigInt(value)
 }
 
-export async function transaction(callback) {
-  const client = await pool.connect();
-  try {
-    await client.query("BEGIN");
-    const result = await callback(client);
-    await client.query("COMMIT");
-    return result;
-  } catch (error) {
-    await client.query("ROLLBACK");
-    throw error;
-  } finally {
-    client.release();
-  }
+export function now() {
+  return new Date()
 }

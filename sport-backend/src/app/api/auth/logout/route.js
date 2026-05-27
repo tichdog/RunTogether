@@ -1,8 +1,9 @@
-import { clearSessionCookie } from "@/lib/server/auth";
-import { noContent, route } from "@/lib/server/response";
+import { clearAuthCookies, revokeAuthSession } from '@/lib/server/auth'
+import { noContent, route } from '@/lib/server/response'
 
-export const POST = route(async () => {
-  const response = noContent();
-  clearSessionCookie(response);
-  return response;
-});
+export const POST = route(async (request) => {
+  await revokeAuthSession(request)
+  const response = noContent()
+  clearAuthCookies(response)
+  return response
+})
