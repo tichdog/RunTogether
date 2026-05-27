@@ -4,8 +4,19 @@ import { logger } from './logger'
 
 const REQUEST_ID_HEADER = 'x-request-id'
 
+function serializeDatabaseValue(value) {
+  if (typeof value === 'bigint') return value.toString()
+  if (Array.isArray(value)) return value.map(serializeDatabaseValue)
+  if (!value || typeof value !== 'object' || value instanceof Date) return value
+  if (value.constructor?.name === 'Decimal') return value.toString()
+
+  return Object.fromEntries(
+    Object.entries(value).map(([key, nestedValue]) => [key, serializeDatabaseValue(nestedValue)])
+  )
+}
+
 export function json(payload, status = 200) {
-  return NextResponse.json(payload, {
+  return NextResponse.json(serializeDatabaseValue(payload), {
     status,
     headers: {
       'Cache-Control': 'no-store',

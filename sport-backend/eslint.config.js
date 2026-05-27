@@ -5,7 +5,15 @@ import prettier from 'eslint-config-prettier/flat'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['.next', 'out', 'build', 'coverage', 'uploads', 'public/uploads']),
+  globalIgnores([
+    '.next',
+    'out',
+    'build',
+    'coverage',
+    'uploads',
+    'public/uploads',
+    'src/generated/prisma',
+  ]),
   js.configs.recommended,
   ...nextVitals,
   {

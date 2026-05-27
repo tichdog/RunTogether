@@ -1,27 +1,38 @@
-import { query } from '../server/db'
+import { dbId, prisma } from '../server/db'
 
-export async function createNotification(
-  clientOrPool,
-  { userId, type, title, message, payload = {}, scheduledFor = null }
-) {
-  const runner = clientOrPool?.query ? clientOrPool : null
-  const sql = `insert into notifications (user_id, type, title, message, payload, scheduled_for)
-               values ($1, $2, $3, $4, $5::jsonb, $6)
-               returning *`
-  const params = [userId, type, title, message, JSON.stringify(payload), scheduledFor]
-  const result = runner ? await runner.query(sql, params) : await query(sql, params)
-  return result.rows[0]
+function jsonValue(value) {
+  if (typeof value === 'bigint') return value.toString()
+  if (Array.isArray(value)) return value.map(jsonValue)
+  if (!value || typeof value !== 'object' || value instanceof Date) return value
+  return Object.fromEntries(Object.entries(value).map(([key, nested]) => [key, jsonValue(nested)]))
 }
 
-export async function notifyWorkoutParticipants(client, workoutId, notification) {
-  const { rows } = await client.query(
-    `select user_id
-       from workout_participants
-      where workout_id = $1 and status = 'confirmed'`,
-    [workoutId]
-  )
+export async function createNotification(
+  client = prisma,
+  { userId, type, title, message, payload = {}, scheduledFor = null }
+) {
+  return client.notifications.create({
+    data: {
+      user_id: dbId(userId),
+      type,
+      title,
+      message,
+      payload: jsonValue(payload),
+      scheduled_for: scheduledFor,
+    },
+  })
+}
 
-  for (const row of rows) {
+export async function notifyWorkoutParticipants(client = prisma, workoutId, notification) {
+  const participants = await client.workout_participants.findMany({
+    where: {
+      workout_id: dbId(workoutId),
+      status: 'confirmed',
+    },
+    select: { user_id: true },
+  })
+
+  for (const row of participants) {
     await createNotification(client, {
       userId: row.user_id,
       payload: { workoutId, ...(notification.payload || {}) },

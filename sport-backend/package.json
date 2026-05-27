@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "next dev -p 4000",
     "dev:logs": "next dev -p 4000 | pino-pretty --translateTime SYS:standard --ignore pid,hostname",
+    "postinstall": "prisma generate",
     "db:up": "docker compose --profile database up -d postgres",
     "db:down": "docker compose stop postgres",
     "observability:up": "docker compose up -d loki promtail grafana",
@@ -16,15 +17,19 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier \"src/**/*.js\" \"middleware.js\" \"next.config.mjs\" \"eslint.config.js\" \"jsconfig.json\" \"package.json\" \"docker-compose.yml\" \"README.md\" --write --config ../.prettierrc --ignore-path ../.prettierignore",
     "format:check": "prettier \"src/**/*.js\" \"middleware.js\" \"next.config.mjs\" \"eslint.config.js\" \"jsconfig.json\" \"package.json\" \"docker-compose.yml\" \"README.md\" --check --config ../.prettierrc --ignore-path ../.prettierignore",
-    "db:schema": "psql \"$DATABASE_URL\" -f src/db/schema.sql",
-    "db:seed": "psql \"$DATABASE_URL\" -f src/db/seed.sql",
+    "prisma:generate": "prisma generate",
+    "db:pull": "prisma db pull",
+    "db:studio": "prisma studio",
+    "db:schema": "prisma db execute --file src/db/schema.sql --schema prisma/schema.prisma",
+    "db:seed": "prisma db execute --file src/db/seed.sql --schema prisma/schema.prisma",
     "check": "next build"
   },
   "dependencies": {
+    "@prisma/adapter-pg": "^7.8.0",
+    "@prisma/client": "^7.8.0",
     "bcryptjs": "^2.4.3",
     "jsonwebtoken": "^9.0.2",
     "next": "^16.2.6",
-    "pg": "^8.13.1",
     "pino": "^10.3.1",
     "react": "^19.2.6",
     "react-dom": "^19.2.6"
@@ -39,6 +44,7 @@
     "eslint-config-prettier": "^10.1.8",
     "globals": "^17.6.0",
     "pino-pretty": "^13.1.3",
-    "prettier": "^3.8.3"
+    "prettier": "^3.8.3",
+    "prisma": "^7.8.0"
   }
 }

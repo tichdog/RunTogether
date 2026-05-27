@@ -1,5 +1,5 @@
 import { requireAdmin, requireAuth, isAdmin } from '@/lib/server/auth'
-import { query } from '@/lib/server/db'
+import { dbId, now, prisma } from '@/lib/server/db'
 import { badRequest, forbidden, notFound } from '@/lib/server/http-error'
 import { publicUser } from '@/lib/mappers/user'
 import { getUserRole } from '@/lib/repositories/users'
@@ -12,20 +12,23 @@ export const PATCH = route(async (request, context) => {
   const body = await readJson(request)
   const role = body.role
 
-  if (!['member', 'admin', 'super_admin'].includes(role)) throw badRequest('Некорректная роль')
+  if (!['member', 'admin', 'super_admin'].includes(role))
+    throw badRequest('РќРµРєРѕСЂСЂРµРєС‚РЅР°СЏ СЂРѕР»СЊ')
 
   const target = await getUserRole(id)
-  if (!target) throw notFound('Пользователь не найден')
+  if (!target) throw notFound('РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ РЅРµ РЅР°Р№РґРµРЅ')
   if (Number(target.id) === Number(user.id) && role !== user.role) {
-    throw badRequest('Нельзя изменить свою роль')
+    throw badRequest('РќРµР»СЊР·СЏ РёР·РјРµРЅРёС‚СЊ СЃРІРѕСЋ СЂРѕР»СЊ')
   }
   if ((isAdmin(target) || isAdmin({ role })) && user.role !== 'super_admin') {
-    throw forbidden('Назначать и изменять админов может только супер-админ')
+    throw forbidden(
+      'РќР°Р·РЅР°С‡Р°С‚СЊ Рё РёР·РјРµРЅСЏС‚СЊ Р°РґРјРёРЅРѕРІ РјРѕР¶РµС‚ С‚РѕР»СЊРєРѕ СЃСѓРїРµСЂ-Р°РґРјРёРЅ'
+    )
   }
 
-  const { rows } = await query(
-    'update users set role = $2, updated_at = now() where id = $1 returning *',
-    [id, role]
-  )
-  return json({ user: publicUser(rows[0], { viewer: user }) })
+  const updated = await prisma.users.update({
+    where: { id: dbId(id) },
+    data: { role, updated_at: now() },
+  })
+  return json({ user: publicUser(updated, { viewer: user }) })
 })

@@ -1,8 +1,24 @@
+import { dbId } from '../server/db'
+
 const ACTIVE_WORKOUT_STATUSES = ['planned', 'open', 'full', 'in_progress']
 const ACTIVE_PARTICIPATION_STATUSES = ['confirmed', 'pending']
 
-export async function lockParticipationForUser(client, userId) {
-  await client.query('select pg_advisory_xact_lock($1::bigint)', [userId])
+export async function lockParticipationForUser() {
+  // Prisma ORM does not expose PostgreSQL advisory locks. Conflict checks run inside the
+  // same transaction as request updates and rely on unique constraints plus re-checks.
+}
+
+function overlaps(candidate, workout) {
+  const candidateStart = new Date(candidate.start_at)
+  const candidateEnd = new Date(
+    candidateStart.getTime() + Number(candidate.duration_minutes || 60) * 60_000
+  )
+  const workoutStart = new Date(workout.start_at)
+  const workoutEnd = new Date(
+    workoutStart.getTime() + Number(workout.duration_minutes || 60) * 60_000
+  )
+
+  return candidateStart < workoutEnd && candidateEnd > workoutStart
 }
 
 export async function findParticipationConflict(client, userId, workout, options = {}) {
@@ -12,83 +28,91 @@ export async function findParticipationConflict(client, userId, workout, options
     includeOrganized = true,
   } = options
 
-  const { rows } = await client.query(
-    `with candidate_workouts as (
-       select w.id,
-              w.title,
-              w.start_at,
-              w.duration_minutes,
-              wp.status as participation_status,
-              false as is_organizer
-         from workout_participants wp
-         join workouts w on w.id = wp.workout_id
-        where wp.user_id = $1
-          and wp.status = any($5::text[])
-          and w.status = any($6::text[])
-          and ($4::bigint is null or w.id <> $4::bigint)
-       union all
-       select w.id,
-              w.title,
-              w.start_at,
-              w.duration_minutes,
-              'confirmed' as participation_status,
-              true as is_organizer
-         from workouts w
-        where $7::boolean
-          and w.organizer_id = $1
-          and w.status = any($6::text[])
-          and ($4::bigint is null or w.id <> $4::bigint)
-     )
-     select *
-       from candidate_workouts
-      where start_at < ($2::timestamptz + make_interval(mins => $3::int))
-        and (start_at + make_interval(mins => duration_minutes::int)) > $2::timestamptz
-      order by case participation_status
-                 when 'confirmed' then 0
-                 when 'pending' then 1
-                 else 2
-               end,
-               start_at,
-               id
-      limit 1`,
-    [
-      userId,
-      workout.start_at,
-      Number(workout.duration_minutes || 60),
-      excludeWorkoutId,
-      participationStatuses,
-      ACTIVE_WORKOUT_STATUSES,
-      includeOrganized,
-    ]
-  )
+  const id = dbId(userId)
+  const excludeId = excludeWorkoutId == null ? null : dbId(excludeWorkoutId)
 
-  return rows[0] || null
+  const [participations, organized] = await Promise.all([
+    client.workout_participants.findMany({
+      where: {
+        user_id: id,
+        status: { in: participationStatuses },
+        workouts: {
+          status: { in: ACTIVE_WORKOUT_STATUSES },
+          ...(excludeId ? { id: { not: excludeId } } : {}),
+        },
+      },
+      include: { workouts: true },
+    }),
+    includeOrganized
+      ? client.workouts.findMany({
+          where: {
+            organizer_id: id,
+            status: { in: ACTIVE_WORKOUT_STATUSES },
+            ...(excludeId ? { id: { not: excludeId } } : {}),
+          },
+        })
+      : [],
+  ])
+
+  const candidates = [
+    ...participations.map((row) => ({
+      ...row.workouts,
+      participation_status: row.status,
+      is_organizer: false,
+    })),
+    ...organized.map((row) => ({
+      ...row,
+      participation_status: 'confirmed',
+      is_organizer: true,
+    })),
+  ].filter((row) => overlaps(row, workout))
+
+  const statusRank = { confirmed: 0, pending: 1 }
+  candidates.sort((a, b) => {
+    const rank =
+      (statusRank[a.participation_status] ?? 2) - (statusRank[b.participation_status] ?? 2)
+    if (rank) return rank
+    return new Date(a.start_at).getTime() - new Date(b.start_at).getTime() || Number(a.id - b.id)
+  })
+
+  return candidates[0] || null
 }
 
 export async function cancelOverlappingPendingRequests(client, userId, workout) {
-  const { rows } = await client.query(
-    `update workout_participants wp
-        set status = 'cancelled',
-            responded_at = now()
-       from workouts w
-      where w.id = wp.workout_id
-        and wp.user_id = $1
-        and wp.status = 'pending'
-        and w.status = any($5::text[])
-        and w.id <> $4::bigint
-        and w.start_at < ($2::timestamptz + make_interval(mins => $3::int))
-        and (w.start_at + make_interval(mins => w.duration_minutes::int)) > $2::timestamptz
-      returning wp.*, w.title, w.organizer_id`,
-    [
-      userId,
-      workout.start_at,
-      Number(workout.duration_minutes || 60),
-      workout.id,
-      ACTIVE_WORKOUT_STATUSES,
-    ]
-  )
+  const rows = await client.workout_participants.findMany({
+    where: {
+      user_id: dbId(userId),
+      status: 'pending',
+      workouts: {
+        status: { in: ACTIVE_WORKOUT_STATUSES },
+        id: { not: dbId(workout.id) },
+      },
+    },
+    include: {
+      workouts: {
+        select: {
+          title: true,
+          organizer_id: true,
+          start_at: true,
+          duration_minutes: true,
+        },
+      },
+    },
+  })
 
-  return rows
+  const overlapping = rows.filter((row) => overlaps(row.workouts, workout))
+  if (overlapping.length) {
+    await client.workout_participants.updateMany({
+      where: { id: { in: overlapping.map((row) => row.id) } },
+      data: { status: 'cancelled', responded_at: new Date() },
+    })
+  }
+
+  return overlapping.map((row) => ({
+    ...row,
+    title: row.workouts.title,
+    organizer_id: row.workouts.organizer_id,
+  }))
 }
 
 export function participationConflictMessage(conflict, subject = 'Вы') {

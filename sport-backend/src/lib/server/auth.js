@@ -1,7 +1,7 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import jwt from 'jsonwebtoken'
 import { env } from './env'
-import { query } from './db'
+import { dbId, now, prisma } from './db'
 import { forbidden, HttpError } from './http-error'
 
 const ADMIN_ROLES = new Set(['admin', 'super_admin'])
@@ -34,7 +34,7 @@ function clientInfo(request) {
 function signAccessToken(user, sessionId, accessJti) {
   return jwt.sign(
     {
-      sub: user.id,
+      sub: user.id.toString(),
       role: user.role,
       sid: sessionId,
       jti: accessJti,
@@ -53,12 +53,17 @@ export async function createAuthSession(user, request) {
   const refreshToken = createRefreshToken()
   const { userAgent, ipAddress } = clientInfo(request)
 
-  await query(
-    `insert into auth_sessions (
-       id, user_id, access_jti, refresh_token_hash, user_agent, ip_address, expires_at
-     ) values ($1, $2, $3, $4, $5, $6, $7)`,
-    [sessionId, user.id, accessJti, hashToken(refreshToken), userAgent, ipAddress, refreshExpiresAt()]
-  )
+  await prisma.auth_sessions.create({
+    data: {
+      id: sessionId,
+      user_id: dbId(user.id),
+      access_jti: accessJti,
+      refresh_token_hash: hashToken(refreshToken),
+      user_agent: userAgent,
+      ip_address: ipAddress,
+      expires_at: refreshExpiresAt(),
+    },
+  })
 
   return {
     accessToken: signAccessToken(user, sessionId, accessJti),
@@ -71,30 +76,18 @@ export async function rotateAuthSession(refreshToken, request) {
     throw new HttpError(401, 'Нужна авторизация')
   }
 
-  const { rows } = await query(
-    `select s.id as session_id,
-            s.expires_at as session_expires_at,
-            s.revoked_at as session_revoked_at,
-            u.*
-       from auth_sessions s
-       join users u on u.id = s.user_id
-      where s.refresh_token_hash = $1
-      limit 1`,
-    [hashToken(refreshToken)]
-  )
-  const session = rows[0]
+  const session = await prisma.auth_sessions.findUnique({
+    where: { refresh_token_hash: hashToken(refreshToken) },
+    include: { users: true },
+  })
 
-  if (
-    !session ||
-    session.session_revoked_at ||
-    new Date(session.session_expires_at).getTime() <= Date.now()
-  ) {
+  if (!session || session.revoked_at || new Date(session.expires_at).getTime() <= Date.now()) {
     throw new HttpError(401, 'Сессия недействительна')
   }
 
-  const user = await refreshExpiredBlock(session)
+  const user = await refreshExpiredBlock(session.users)
   if (!user || user.account_status === 'blocked') {
-    await revokeAuthSessionById(session.session_id)
+    await revokeAuthSessionById(session.id)
     throw new HttpError(401, 'Сессия недействительна')
   }
 
@@ -102,28 +95,21 @@ export async function rotateAuthSession(refreshToken, request) {
   const nextRefreshToken = createRefreshToken()
   const { userAgent, ipAddress } = clientInfo(request)
 
-  await query(
-    `update auth_sessions
-        set access_jti = $1,
-            refresh_token_hash = $2,
-            user_agent = coalesce($3, user_agent),
-            ip_address = coalesce($4, ip_address),
-            expires_at = $5,
-            last_used_at = now(),
-            updated_at = now()
-      where id = $6`,
-    [
-      nextAccessJti,
-      hashToken(nextRefreshToken),
-      userAgent,
-      ipAddress,
-      refreshExpiresAt(),
-      session.session_id,
-    ]
-  )
+  await prisma.auth_sessions.update({
+    where: { id: session.id },
+    data: {
+      access_jti: nextAccessJti,
+      refresh_token_hash: hashToken(nextRefreshToken),
+      ...(userAgent ? { user_agent: userAgent } : {}),
+      ...(ipAddress ? { ip_address: ipAddress } : {}),
+      expires_at: refreshExpiresAt(),
+      last_used_at: now(),
+      updated_at: now(),
+    },
+  })
 
   return {
-    accessToken: signAccessToken(user, session.session_id, nextAccessJti),
+    accessToken: signAccessToken(user, session.id, nextAccessJti),
     refreshToken: nextRefreshToken,
     user,
   }
@@ -131,25 +117,24 @@ export async function rotateAuthSession(refreshToken, request) {
 
 async function revokeAuthSessionById(sessionId) {
   if (!sessionId) return
-  await query(
-    `update auth_sessions
-        set revoked_at = coalesce(revoked_at, now()),
-            updated_at = now()
-      where id = $1`,
-    [sessionId]
-  )
+  const session = await prisma.auth_sessions.findUnique({ where: { id: sessionId } })
+  if (!session) return
+  await prisma.auth_sessions.update({
+    where: { id: sessionId },
+    data: {
+      revoked_at: session.revoked_at || now(),
+      updated_at: now(),
+    },
+  })
 }
 
 export async function revokeAuthSession(request) {
   const refreshToken = request.cookies.get(env.refreshCookieName)?.value
   if (refreshToken) {
-    await query(
-      `update auth_sessions
-          set revoked_at = coalesce(revoked_at, now()),
-              updated_at = now()
-        where refresh_token_hash = $1`,
-      [hashToken(refreshToken)]
-    )
+    const session = await prisma.auth_sessions.findUnique({
+      where: { refresh_token_hash: hashToken(refreshToken) },
+    })
+    if (session) await revokeAuthSessionById(session.id)
     return
   }
 
@@ -201,17 +186,15 @@ export async function refreshExpiredBlock(user) {
     return user
   }
 
-  const { rows } = await query(
-    `update users
-        set account_status = 'active',
-            blocked_until = null,
-            block_reason = null,
-            updated_at = now()
-      where id = $1
-      returning *`,
-    [user.id]
-  )
-  return rows[0] || user
+  return prisma.users.update({
+    where: { id: dbId(user.id) },
+    data: {
+      account_status: 'active',
+      blocked_until: null,
+      block_reason: null,
+      updated_at: now(),
+    },
+  })
 }
 
 export async function requireAuth(request) {
@@ -230,20 +213,18 @@ export async function requireAuth(request) {
       throw new HttpError(401, 'Сессия недействительна')
     }
 
-    const { rows } = await query(
-      `select u.*
-         from auth_sessions s
-         join users u on u.id = s.user_id
-        where s.id = $1
-          and s.user_id = $2
-          and s.access_jti = $3
-          and s.revoked_at is null
-          and s.expires_at > now()
-        limit 1`,
-      [payload.sid, payload.sub, payload.jti]
-    )
+    const session = await prisma.auth_sessions.findFirst({
+      where: {
+        id: payload.sid,
+        user_id: dbId(payload.sub),
+        access_jti: payload.jti,
+        revoked_at: null,
+        expires_at: { gt: now() },
+      },
+      include: { users: true },
+    })
 
-    const user = await refreshExpiredBlock(rows[0])
+    const user = await refreshExpiredBlock(session?.users)
     if (!user || user.account_status === 'blocked') {
       throw new HttpError(401, 'Сессия недействительна')
     }

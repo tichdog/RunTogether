@@ -1,7 +1,8 @@
 import { createNotification } from './notifications'
-import { query } from '../server/db'
+import { dbId, prisma } from '../server/db'
 
 const ACHIEVEMENTS_CACHE_TTL_MS = 60_000
+const COMPLETED_WORKOUT_STATUSES = ['completed', 'archived']
 let adminAchievementsCache = null
 
 export function clearAchievementsCache() {
@@ -13,43 +14,65 @@ export async function getAdminAchievements() {
     return adminAchievementsCache.value.map((achievement) => ({ ...achievement }))
   }
 
-  const { rows } = await query(
-    `select a.*,
-            count(ua.user_id)::int as earned_count
-       from achievements a
-       left join user_achievements ua on ua.achievement_id = a.id
-      group by a.id
-      order by a.id desc`
-  )
+  const rows = await prisma.achievements.findMany({
+    include: {
+      _count: { select: { user_achievements: true } },
+    },
+    orderBy: { id: 'desc' },
+  })
+
+  const achievements = rows.map(({ _count, ...achievement }) => ({
+    ...achievement,
+    earned_count: _count.user_achievements,
+  }))
 
   adminAchievementsCache = {
-    value: rows,
+    value: achievements,
     expiresAt: Date.now() + ACHIEVEMENTS_CACHE_TTL_MS,
   }
 
-  return rows.map((achievement) => ({ ...achievement }))
+  return achievements.map((achievement) => ({ ...achievement }))
 }
 
-export async function evaluateAchievements(client, userId) {
-  const { rows: achievements } = await client.query('select * from achievements')
-  const { rows } = await client.query(
-    `select
-       count(distinct wp.workout_id) filter (where wp.status = 'confirmed' and w.status in ('completed', 'archived')) as completed_count,
-       coalesce(sum(w.distance_km) filter (where wp.status = 'confirmed' and w.status in ('completed', 'archived')), 0) as distance_sum,
-       count(distinct wp.workout_id) filter (where wp.status = 'confirmed' and w.status in ('completed', 'archived') and extract(hour from w.start_at) < 9) as morning_count,
-       (
-         select count(*)::int
-           from workouts organized
-          where organized.organizer_id = $1
-            and organized.status in ('completed', 'archived')
-       ) as organized_count
-     from workout_participants wp
-     join workouts w on w.id = wp.workout_id
-     where wp.user_id = $1`,
-    [userId]
-  )
+async function getAchievementStats(client, userId) {
+  const id = dbId(userId)
+  const [participations, organizedCount] = await Promise.all([
+    client.workout_participants.findMany({
+      where: {
+        user_id: id,
+        status: 'confirmed',
+        workouts: { status: { in: COMPLETED_WORKOUT_STATUSES } },
+      },
+      include: {
+        workouts: {
+          select: {
+            id: true,
+            distance_km: true,
+            start_at: true,
+          },
+        },
+      },
+    }),
+    client.workouts.count({
+      where: {
+        organizer_id: id,
+        status: { in: COMPLETED_WORKOUT_STATUSES },
+      },
+    }),
+  ])
 
-  const stats = rows[0] || {}
+  return {
+    completed_count: participations.length,
+    distance_sum: participations.reduce((sum, row) => sum + Number(row.workouts.distance_km), 0),
+    morning_count: participations.filter((row) => new Date(row.workouts.start_at).getHours() < 9)
+      .length,
+    organized_count: organizedCount,
+  }
+}
+
+export async function evaluateAchievements(client = prisma, userId) {
+  const achievements = await client.achievements.findMany()
+  const stats = await getAchievementStats(client, userId)
   const earned = []
 
   for (const achievement of achievements) {
@@ -65,26 +88,30 @@ export async function evaluateAchievements(client, userId) {
 
     if (!matches) continue
 
-    const inserted = await client.query(
-      `insert into user_achievements (user_id, achievement_id)
-       values ($1, $2)
-       on conflict do nothing
-       returning *`,
-      [userId, achievement.id]
-    )
+    let inserted = false
+    try {
+      await client.user_achievements.create({
+        data: {
+          user_id: dbId(userId),
+          achievement_id: achievement.id,
+        },
+      })
+      inserted = true
+    } catch (error) {
+      if (error.code !== 'P2002') throw error
+    }
 
-    if (inserted.rowCount) {
+    if (inserted) {
       clearAchievementsCache()
       earned.push(achievement)
-      await client.query(
-        `insert into activity_feed (type, actor_id, achievement_id, metadata)
-         values ('achievement_earned', $1, $2, $3::jsonb)`,
-        [
-          userId,
-          achievement.id,
-          JSON.stringify({ title: achievement.title, icon: achievement.icon }),
-        ]
-      )
+      await client.activity_feed.create({
+        data: {
+          type: 'achievement_earned',
+          actor_id: dbId(userId),
+          achievement_id: achievement.id,
+          metadata: { title: achievement.title, icon: achievement.icon },
+        },
+      })
       await createNotification(client, {
         userId,
         type: 'achievement',
@@ -98,8 +125,11 @@ export async function evaluateAchievements(client, userId) {
   return earned
 }
 
-export async function evaluateAchievementsForAllUsers(client) {
-  const { rows: users } = await client.query("select id from users where account_status = 'active'")
+export async function evaluateAchievementsForAllUsers(client = prisma) {
+  const users = await client.users.findMany({
+    where: { account_status: 'active' },
+    select: { id: true },
+  })
 
   for (const user of users) {
     await evaluateAchievements(client, user.id)

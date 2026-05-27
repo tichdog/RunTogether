@@ -1,4 +1,4 @@
-import { query } from '../server/db'
+import { prisma, now } from '../server/db'
 
 const DEFAULTS = {
   require_verified_to_create_workouts: true,
@@ -21,7 +21,7 @@ export async function getSettings() {
     return { ...settingsCache.value }
   }
 
-  const { rows } = await query('select key, value from system_settings')
+  const rows = await prisma.system_settings.findMany()
   const value = rows.reduce(
     (acc, row) => {
       acc[row.key] = row.value
@@ -42,12 +42,11 @@ export async function upsertSettings(values) {
   const allowed = Object.keys(DEFAULTS)
   for (const key of allowed) {
     if (Object.prototype.hasOwnProperty.call(values, key)) {
-      await query(
-        `insert into system_settings (key, value)
-         values ($1, $2::jsonb)
-         on conflict (key) do update set value = excluded.value, updated_at = now()`,
-        [key, JSON.stringify(values[key])]
-      )
+      await prisma.system_settings.upsert({
+        where: { key },
+        create: { key, value: values[key], updated_at: now() },
+        update: { value: values[key], updated_at: now() },
+      })
     }
   }
   clearSettingsCache()

@@ -1,5 +1,7 @@
 import { badRequest } from '../server/http-error'
 import { isAdmin } from '../server/auth'
+import { dbId, prisma } from '../server/db'
+import { workoutInclude, buildWorkoutRows } from '../services/workouts'
 
 const WORKOUT_LIMITS = {
   durationMinutes: { min: 15, max: 1440 },
@@ -64,18 +66,11 @@ function assertNumberInRange(value, limits, label) {
   }
 }
 
-export async function getWorkoutRow(client, workoutId, lock = false) {
-  const { rows } = await client.query(
-    `select w.*,
-            u.full_name as organizer_name,
-            (select count(*)
-               from workout_participants wp
-              where wp.workout_id = w.id and wp.status = 'confirmed') as confirmed_count
-       from workouts w
-       join users u on u.id = w.organizer_id
-      where w.id = $1
-      ${lock ? 'for update of w' : ''}`,
-    [workoutId]
-  )
-  return rows[0]
+export async function getWorkoutRow(client = prisma, workoutId) {
+  const workout = await client.workouts.findUnique({
+    where: { id: dbId(workoutId) },
+    include: workoutInclude,
+  })
+
+  return workout ? (await buildWorkoutRows([workout]))[0] : null
 }

@@ -1,4 +1,4 @@
-import { query } from '@/lib/server/db'
+import { prisma } from '@/lib/server/db'
 import { badRequest } from '@/lib/server/http-error'
 import { json, route } from '@/lib/server/response'
 
@@ -16,7 +16,10 @@ export const GET = route(async (request) => {
     throw badRequest('Некорректный email')
   }
 
-  const { rowCount } = await query('select 1 from users where lower(email) = $1 limit 1', [email])
+  const existing = await prisma.users.findFirst({
+    where: { email: { equals: email, mode: 'insensitive' } },
+    select: { id: true },
+  })
 
-  return json({ email, available: rowCount === 0 })
+  return json({ email, available: !existing })
 })

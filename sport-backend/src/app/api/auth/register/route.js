@@ -1,5 +1,5 @@
 import bcrypt from 'bcryptjs'
-import { query } from '@/lib/server/db'
+import { prisma } from '@/lib/server/db'
 import { badRequest, HttpError } from '@/lib/server/http-error'
 import { json, readJson, route } from '@/lib/server/response'
 import { publicUser } from '@/lib/mappers/user'
@@ -49,33 +49,38 @@ export const POST = route(async (request) => {
     )
   }
 
-  const existing = await query(
-    `select email, phone from users
-      where lower(email) = $1 or ($2::text is not null and phone = $2)
-      limit 1`,
-    [email, phone]
-  )
-  if (existing.rows[0]?.email?.toLowerCase() === email) {
+  const existing = await prisma.users.findFirst({
+    where: {
+      OR: [{ email: { equals: email, mode: 'insensitive' } }, ...(phone ? [{ phone }] : [])],
+    },
+    select: { email: true, phone: true },
+  })
+  if (existing?.email?.toLowerCase() === email) {
     throw new HttpError(409, 'Пользователь с такой почтой уже существует')
   }
-  if (phone && existing.rows[0]?.phone === phone) {
+  if (phone && existing?.phone === phone) {
     throw new HttpError(409, 'Пользователь с таким телефоном уже существует')
   }
 
   try {
     const passwordHash = await bcrypt.hash(password, 10)
-    const { rows } = await query(
-      `insert into users (email, phone, password_hash, first_name, last_name, gender, full_name)
-       values ($1, $2, $3, $4, $5, $6, $7)
-       returning *`,
-      [email, phone, passwordHash, firstName, lastName, gender, fullName]
-    )
+    const newUser = await prisma.users.create({
+      data: {
+        email,
+        phone,
+        password_hash: passwordHash,
+        first_name: firstName,
+        last_name: lastName,
+        gender,
+        full_name: fullName,
+      },
+    })
 
-    const response = json({ user: publicUser(rows[0], { viewer: rows[0] }) }, 201)
-    setAuthCookies(response, await createAuthSession(rows[0], request))
+    const response = json({ user: publicUser(newUser, { viewer: newUser }) }, 201)
+    setAuthCookies(response, await createAuthSession(newUser, request))
     return response
   } catch (error) {
-    if (error.code === '23505') {
+    if (error.code === 'P2002') {
       throw new HttpError(409, 'Пользователь с такой почтой или телефоном уже существует')
     }
     throw error

@@ -1,9 +1,17 @@
-import { query } from '../server/db'
+import { dbId, prisma } from '../server/db'
 import { isAdmin } from '../server/auth'
 import { evaluateAchievements } from './achievements'
+import { getUserStatsMap } from '../repositories/users'
 
 const TERMINAL = new Set(['cancelled', 'archived'])
 const ARCHIVE_AFTER_MS = 24 * 60 * 60 * 1000
+
+export const workoutInclude = {
+  users: true,
+  workout_participants: {
+    include: { users: true },
+  },
+}
 
 export function deriveWorkoutStatus(workout, confirmedCount = 0, now = new Date()) {
   if (!workout || workout.status === 'cancelled') return workout?.status
@@ -18,57 +26,117 @@ export function deriveWorkoutStatus(workout, confirmedCount = 0, now = new Date(
   return 'open'
 }
 
-export async function syncWorkoutStatus(clientOrPool, workoutId) {
-  const runner = clientOrPool?.query ? clientOrPool : null
-  const exec = (text, params) => (runner ? runner.query(text, params) : query(text, params))
-  const achievementClient = { query: exec }
+export async function syncWorkoutStatus(client = prisma, workoutId) {
+  const workout = await client.workouts.findUnique({
+    where: { id: dbId(workoutId) },
+    include: {
+      workout_participants: {
+        where: { status: 'confirmed' },
+        select: { user_id: true },
+      },
+    },
+  })
 
-  const { rows } = await exec(
-    `select w.*,
-            count(wp.id) filter (where wp.status = 'confirmed') as confirmed_count
-       from workouts w
-       left join workout_participants wp on wp.workout_id = w.id
-      where w.id = $1
-      group by w.id`,
-    [workoutId]
-  )
-
-  const workout = rows[0]
   if (!workout || TERMINAL.has(workout.status)) return workout
 
-  const nextStatus = deriveWorkoutStatus(workout, workout.confirmed_count)
+  const nextStatus = deriveWorkoutStatus(workout, workout.workout_participants.length)
   if (nextStatus !== workout.status) {
-    const updated = await exec(
-      'update workouts set status = $2, updated_at = now() where id = $1 returning *',
-      [workoutId, nextStatus]
-    )
+    const updated = await client.workouts.update({
+      where: { id: workout.id },
+      data: { status: nextStatus, updated_at: new Date() },
+      include: {
+        workout_participants: {
+          where: { status: 'confirmed' },
+          select: { user_id: true },
+        },
+      },
+    })
+
     if (
       nextStatus === 'completed' ||
       (nextStatus === 'archived' && workout.status !== 'completed')
     ) {
-      await evaluateWorkoutAchievements(achievementClient, workoutId)
+      await evaluateWorkoutAchievements(client, updated)
     }
-    return updated.rows[0]
+
+    return { ...updated, confirmed_count: updated.workout_participants.length }
   }
-  return workout
+
+  return { ...workout, confirmed_count: workout.workout_participants.length }
 }
 
-async function evaluateWorkoutAchievements(client, workoutId) {
-  const { rows } = await client.query(
-    `select organizer_id as user_id
-       from workouts
-      where id = $1
-     union
-     select user_id
-       from workout_participants
-      where workout_id = $1
-        and status = 'confirmed'`,
-    [workoutId]
-  )
+async function evaluateWorkoutAchievements(client, workout) {
+  const userIds = new Set([
+    workout.organizer_id.toString(),
+    ...workout.workout_participants.map((row) => row.user_id.toString()),
+  ])
 
-  for (const row of rows) {
-    await evaluateAchievements(client, row.user_id)
+  for (const userId of userIds) {
+    await evaluateAchievements(client, userId)
   }
+}
+
+function initialsFor(user) {
+  return `${user.first_name?.[0] || user.full_name?.[0] || user.email?.[0] || 'U'}${user.last_name?.[0] || ''}`.toUpperCase()
+}
+
+function userCard(user, stats) {
+  return {
+    id: user.id,
+    name: user.full_name,
+    initials: initialsFor(user),
+    avatarUrl: user.avatar_url,
+    role: user.role,
+    stats: { rating: stats?.average_rating ?? null },
+  }
+}
+
+function distanceKm(workout, lat, lng) {
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null
+  if (workout.meeting_lat == null || workout.meeting_lng == null) return null
+
+  const toRad = (value) => (Number(value) * Math.PI) / 180
+  const dLat = toRad(Number(workout.meeting_lat) - lat)
+  const dLng = toRad(Number(workout.meeting_lng) - lng)
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat)) * Math.cos(toRad(Number(workout.meeting_lat))) * Math.sin(dLng / 2) ** 2
+
+  return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+}
+
+export async function buildWorkoutRows(workouts, viewer = null, { lat = null, lng = null } = {}) {
+  const userIds = new Set()
+  for (const workout of workouts) {
+    userIds.add(workout.organizer_id.toString())
+    for (const participant of workout.workout_participants || []) {
+      userIds.add(participant.user_id.toString())
+    }
+  }
+  const stats = await getUserStatsMap([...userIds])
+
+  return workouts.map((workout) => {
+    const confirmed = (workout.workout_participants || []).filter(
+      (participant) => participant.status === 'confirmed'
+    )
+    const viewerRequest = (workout.workout_participants || []).find(
+      (participant) => viewer && Number(participant.user_id) === Number(viewer.id)
+    )
+    const organizerStats = stats.get(workout.organizer_id.toString())
+
+    return {
+      ...workout,
+      organizer_name: workout.users?.full_name,
+      organizer: workout.users ? userCard(workout.users, organizerStats) : null,
+      participants: confirmed.map((participant) =>
+        userCard(participant.users, stats.get(participant.user_id.toString()))
+      ),
+      confirmed_count: confirmed.length,
+      participant_status: viewerRequest?.status || null,
+      participant_request_id: viewerRequest?.id || null,
+      distance_from_user_km: distanceKm(workout, lat, lng),
+    }
+  })
 }
 
 function canViewParticipants(row, viewer) {

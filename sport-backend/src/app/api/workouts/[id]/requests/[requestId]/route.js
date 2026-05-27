@@ -1,5 +1,5 @@
 import { requireAuth } from '@/lib/server/auth'
-import { transaction } from '@/lib/server/db'
+import { dbId, now, prisma } from '@/lib/server/db'
 import { badRequest, forbidden, notFound } from '@/lib/server/http-error'
 import { json, readJson, route } from '@/lib/server/response'
 import { createNotification } from '@/lib/services/notifications'
@@ -18,88 +18,61 @@ export const PATCH = route(async (request, context) => {
   const body = await readJson(request)
   const status = body.status
   if (!['confirmed', 'declined'].includes(status)) {
-    throw badRequest('Статус должен быть confirmed или declined')
+    throw badRequest('РЎС‚Р°С‚СѓСЃ РґРѕР»Р¶РµРЅ Р±С‹С‚СЊ confirmed РёР»Рё declined')
   }
 
-  const result = await transaction(async (client) => {
-    const workout = await getWorkoutRow(client, id, true)
-    if (!workout) throw notFound('Тренировка не найдена')
+  const result = await prisma.$transaction(async (tx) => {
+    const workout = await getWorkoutRow(tx, id)
+    if (!workout) throw notFound('РўСЂРµРЅРёСЂРѕРІРєР° РЅРµ РЅР°Р№РґРµРЅР°')
     if (!isOwnerOrAdmin(user, workout)) throw forbidden()
-    const syncedWorkout = await syncWorkoutStatus(client, id)
+    const syncedWorkout = await syncWorkoutStatus(tx, id)
     workout.status = syncedWorkout?.status || workout.status
     if (!['open', 'planned', 'full'].includes(workout.status)) {
-      throw badRequest('Нельзя изменять заявки после завершения тренировки')
+      throw badRequest(
+        'РќРµР»СЊР·СЏ РёР·РјРµРЅСЏС‚СЊ Р·Р°СЏРІРєРё РїРѕСЃР»Рµ Р·Р°РІРµСЂС€РµРЅРёСЏ С‚СЂРµРЅРёСЂРѕРІРєРё'
+      )
     }
 
-    let existingRequest
+    const existingRequest = await tx.workout_participants.findFirst({
+      where: { id: dbId(requestId), workout_id: dbId(id) },
+    })
+    if (!existingRequest) throw notFound('Р—Р°СЏРІРєР° РЅРµ РЅР°Р№РґРµРЅР°')
 
     if (status === 'confirmed') {
-      const { rows: requestUsers } = await client.query(
-        `select user_id
-           from workout_participants
-          where id = $1 and workout_id = $2`,
-        [requestId, id]
-      )
-      if (!requestUsers[0]) throw notFound('Заявка не найдена')
-
-      await lockParticipationForUser(client, requestUsers[0].user_id)
-
-      const { rows: existingRequests } = await client.query(
-        `select *
-           from workout_participants
-          where id = $1 and workout_id = $2
-          for update`,
-        [requestId, id]
-      )
-      existingRequest = existingRequests[0]
-      if (!existingRequest) throw notFound('Заявка не найдена')
+      await lockParticipationForUser(tx, existingRequest.user_id)
 
       if (
         existingRequest.status !== 'confirmed' &&
         Number(workout.confirmed_count) >= Number(workout.participant_limit)
       ) {
-        throw badRequest('Свободных мест нет')
+        throw badRequest('РЎРІРѕР±РѕРґРЅС‹С… РјРµСЃС‚ РЅРµС‚')
       }
 
-      const conflict = await findParticipationConflict(client, existingRequest.user_id, workout, {
+      const conflict = await findParticipationConflict(tx, existingRequest.user_id, workout, {
         participationStatuses: ['confirmed'],
       })
       if (conflict) {
         throw badRequest(participationConflictMessage(conflict, 'Участник'))
       }
 
-      await cancelOverlappingPendingRequests(client, existingRequest.user_id, workout)
-    } else {
-      const { rows: existingRequests } = await client.query(
-        `select *
-           from workout_participants
-          where id = $1 and workout_id = $2
-          for update`,
-        [requestId, id]
-      )
-      existingRequest = existingRequests[0]
-      if (!existingRequest) throw notFound('Заявка не найдена')
+      await cancelOverlappingPendingRequests(tx, existingRequest.user_id, workout)
     }
 
-    const { rows } = await client.query(
-      `update workout_participants
-          set status = $3, responded_at = now()
-        where id = $1 and workout_id = $2
-        returning *`,
-      [requestId, id, status]
-    )
-    if (!rows[0]) throw notFound('Заявка не найдена')
+    const row = await tx.workout_participants.update({
+      where: { id: existingRequest.id },
+      data: { status, responded_at: now() },
+    })
 
-    await createNotification(client, {
-      userId: rows[0].user_id,
+    await createNotification(tx, {
+      userId: row.user_id,
       type: 'participation_response',
       title: status === 'confirmed' ? 'Заявка подтверждена' : 'Заявка отклонена',
       message: workout.title,
       payload: { workoutId: workout.id, status },
     })
 
-    const synced = await syncWorkoutStatus(client, id)
-    return { request: rows[0], workout: synced }
+    const synced = await syncWorkoutStatus(tx, id)
+    return { request: row, workout: synced }
   })
 
   return json(result)

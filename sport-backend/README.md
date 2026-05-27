@@ -34,6 +34,20 @@ npm run db:seed
 npm run dev
 ```
 
+The backend uses Prisma Client for database access. The current Prisma schema is in
+`prisma/schema.prisma`; generate the client after schema changes with:
+
+```bash
+npm run prisma:generate
+```
+
+Useful Prisma commands:
+
+```bash
+npm run db:pull
+npm run db:studio
+```
+
 Seed admin:
 
 - email: `admin@sport.local`

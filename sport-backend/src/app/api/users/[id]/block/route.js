@@ -1,5 +1,5 @@
 import { requireAdmin, requireAuth, isAdmin } from '@/lib/server/auth'
-import { query } from '@/lib/server/db'
+import { dbId, now, prisma } from '@/lib/server/db'
 import { badRequest, forbidden, notFound } from '@/lib/server/http-error'
 import { publicUser } from '@/lib/mappers/user'
 import { getUserRole } from '@/lib/repositories/users'
@@ -10,7 +10,7 @@ function banUntilFromBody(body) {
   if (mode === 'permanent') return null
   const days = Number(body.banDays || body.days)
   if (!Number.isFinite(days) || days <= 0) {
-    throw badRequest('Укажите срок бана в днях')
+    throw badRequest('РЈРєР°Р¶РёС‚Рµ СЃСЂРѕРє Р±Р°РЅР° РІ РґРЅСЏС…')
   }
   return new Date(Date.now() + days * 24 * 60 * 60 * 1000)
 }
@@ -24,41 +24,35 @@ export const PATCH = route(async (request, context) => {
   const target = await getUserRole(id)
 
   if (!['block', 'unblock'].includes(action)) {
-    throw badRequest('Некорректное действие модерации')
+    throw badRequest('РќРµРєРѕСЂСЂРµРєС‚РЅРѕРµ РґРµР№СЃС‚РІРёРµ РјРѕРґРµСЂР°С†РёРё')
   }
-  if (!target) throw notFound('Пользователь не найден')
+  if (!target) throw notFound('РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ РЅРµ РЅР°Р№РґРµРЅ')
   if (Number(target.id) === Number(user.id)) {
-    throw badRequest('Нельзя заблокировать самого себя')
+    throw badRequest('РќРµР»СЊР·СЏ Р·Р°Р±Р»РѕРєРёСЂРѕРІР°С‚СЊ СЃР°РјРѕРіРѕ СЃРµР±СЏ')
   }
   if (isAdmin(target) && user.role !== 'super_admin') {
-    throw forbidden('Блокировать админов может только супер-админ')
-  }
-
-  if (action === 'unblock') {
-    const { rows } = await query(
-      `update users
-          set account_status = 'active',
-              blocked_until = null,
-              block_reason = null,
-              updated_at = now()
-        where id = $1
-        returning *`,
-      [id]
+    throw forbidden(
+      'Р‘Р»РѕРєРёСЂРѕРІР°С‚СЊ Р°РґРјРёРЅРѕРІ РјРѕР¶РµС‚ С‚РѕР»СЊРєРѕ СЃСѓРїРµСЂ-Р°РґРјРёРЅ'
     )
-    return json({ user: publicUser(rows[0], { viewer: user }) })
   }
 
-  const banUntil = banUntilFromBody(body)
-  const reason = String(body.reason || 'Блокировка администратором').trim()
-  const { rows } = await query(
-    `update users
-        set account_status = 'blocked',
-            blocked_until = $2,
-            block_reason = $3,
-            updated_at = now()
-      where id = $1
-      returning *`,
-    [id, banUntil, reason]
-  )
-  return json({ user: publicUser(rows[0], { viewer: user }) })
+  const data =
+    action === 'unblock'
+      ? {
+          account_status: 'active',
+          blocked_until: null,
+          block_reason: null,
+          updated_at: now(),
+        }
+      : {
+          account_status: 'blocked',
+          blocked_until: banUntilFromBody(body),
+          block_reason: String(
+            body.reason || 'Р‘Р»РѕРєРёСЂРѕРІРєР° Р°РґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂРѕРј'
+          ).trim(),
+          updated_at: now(),
+        }
+
+  const updated = await prisma.users.update({ where: { id: dbId(id) }, data })
+  return json({ user: publicUser(updated, { viewer: user }) })
 })

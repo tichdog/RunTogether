@@ -1,5 +1,5 @@
 import bcrypt from 'bcryptjs'
-import { query } from '@/lib/server/db'
+import { prisma } from '@/lib/server/db'
 import { HttpError, badRequest } from '@/lib/server/http-error'
 import { createAuthSession, refreshExpiredBlock, setAuthCookies } from '@/lib/server/auth'
 import { publicUser } from '@/lib/mappers/user'
@@ -17,11 +17,12 @@ export const POST = route(async (request) => {
     throw badRequest('Некорректный email')
   }
 
-  const { rows } = await query(
-    'select * from users where lower(email) = $1 or phone = $2 limit 1',
-    [login, rawLogin]
-  )
-  const user = await refreshExpiredBlock(rows[0])
+  const found = await prisma.users.findFirst({
+    where: {
+      OR: [{ email: { equals: login, mode: 'insensitive' } }, { phone: rawLogin }],
+    },
+  })
+  const user = await refreshExpiredBlock(found)
   if (!user || !(await bcrypt.compare(password, user.password_hash))) {
     throw new HttpError(401, 'Неверный логин или пароль')
   }
