@@ -3,7 +3,7 @@ import { query } from '@/lib/server/db'
 import { badRequest, HttpError } from '@/lib/server/http-error'
 import { json, readJson, route } from '@/lib/server/response'
 import { publicUser } from '@/lib/mappers/user'
-import { setSessionCookie, signSession } from '@/lib/server/auth'
+import { createAuthSession, setAuthCookies } from '@/lib/server/auth'
 
 function normalizeEmail(email) {
   return email ? String(email).trim().toLowerCase() : null
@@ -72,7 +72,7 @@ export const POST = route(async (request) => {
     )
 
     const response = json({ user: publicUser(rows[0], { viewer: rows[0] }) }, 201)
-    setSessionCookie(response, signSession(rows[0]))
+    setAuthCookies(response, await createAuthSession(rows[0], request))
     return response
   } catch (error) {
     if (error.code === '23505') {

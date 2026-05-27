@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs'
 import { query } from '@/lib/server/db'
 import { HttpError, badRequest } from '@/lib/server/http-error'
-import { refreshExpiredBlock, setSessionCookie, signSession } from '@/lib/server/auth'
+import { createAuthSession, refreshExpiredBlock, setAuthCookies } from '@/lib/server/auth'
 import { publicUser } from '@/lib/mappers/user'
 import { json, readJson, route } from '@/lib/server/response'
 
@@ -34,6 +34,6 @@ export const POST = route(async (request) => {
   }
 
   const response = json({ user: publicUser(user, { viewer: user }) })
-  setSessionCookie(response, signSession(user))
+  setAuthCookies(response, await createAuthSession(user, request))
   return response
 })

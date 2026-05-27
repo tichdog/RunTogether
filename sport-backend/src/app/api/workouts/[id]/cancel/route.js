@@ -32,5 +32,5 @@ export const POST = route(async (request, context) => {
     })
     return rows[0]
   })
-  return json({ workout: workoutPayload(cancelled) })
+  return json({ workout: workoutPayload(cancelled, user) })
 })

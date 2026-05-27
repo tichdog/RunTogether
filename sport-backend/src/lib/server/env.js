@@ -12,8 +12,11 @@ export const env = {
   databaseUrl:
     process.env.DATABASE_URL || 'postgres://postgres:postgres@localhost:5433/sport_training',
   jwtSecret: process.env.JWT_SECRET || 'dev-secret-change-me',
-  jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
-  cookieName: process.env.COOKIE_NAME || 'sport_session',
+  jwtAccessExpiresIn: process.env.JWT_ACCESS_EXPIRES_IN || '15m',
+  accessCookieName: process.env.ACCESS_COOKIE_NAME || 'sport_access_token',
+  refreshCookieName: process.env.REFRESH_COOKIE_NAME || 'sport_refresh_token',
+  accessCookieMaxAge: numberFromEnv('ACCESS_COOKIE_MAX_AGE_SECONDS', 15 * 60),
+  refreshCookieMaxAge: numberFromEnv('REFRESH_COOKIE_MAX_AGE_SECONDS', 30 * 24 * 60 * 60),
   uploadUrlPath: '/uploads',
   cronSecret: process.env.CRON_SECRET || '',
   logLevel: process.env.LOG_LEVEL || 'info',

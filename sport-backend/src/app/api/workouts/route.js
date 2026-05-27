@@ -117,7 +117,7 @@ export const GET = route(async (request) => {
         if (archiveOnly) return row.status === 'archived'
         return includeArchived || row.status !== 'archived'
       })
-      .map(workoutPayload),
+      .map((row) => workoutPayload(row, user)),
   })
 })
 
@@ -163,7 +163,12 @@ export const POST = route(async (request) => {
   )
 
   return json(
-    { workout: workoutPayload({ ...rows[0], organizer_name: user.full_name, confirmed_count: 0 }) },
+    {
+      workout: workoutPayload(
+        { ...rows[0], organizer_name: user.full_name, confirmed_count: 0 },
+        user
+      ),
+    },
     201
   )
 })

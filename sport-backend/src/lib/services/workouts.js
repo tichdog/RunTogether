@@ -1,4 +1,5 @@
 import { query } from '../server/db'
+import { isAdmin } from '../server/auth'
 import { evaluateAchievements } from './achievements'
 
 const TERMINAL = new Set(['cancelled', 'archived'])
@@ -70,15 +71,26 @@ async function evaluateWorkoutAchievements(client, workoutId) {
   }
 }
 
-export function workoutPayload(row) {
+function canViewParticipants(row, viewer) {
+  return (
+    viewer &&
+    (isAdmin(viewer) ||
+      Number(row.organizer_id) === Number(viewer.id) ||
+      row.participant_status === 'confirmed')
+  )
+}
+
+export function workoutPayload(row, viewer = null) {
   const confirmed = Number(row.confirmed_count || 0)
   const status = row.status === 'archived' ? 'completed' : row.status
+  const participantsVisible = canViewParticipants(row, viewer)
   return {
     id: row.id,
     organizerId: row.organizer_id,
     organizerName: row.organizer_name,
     organizer: row.organizer || null,
-    participants: row.participants || [],
+    participants: participantsVisible ? row.participants || [] : [],
+    participantsHidden: Boolean(viewer) && !participantsVisible,
     title: row.title,
     description: row.description,
     startAt: row.start_at,

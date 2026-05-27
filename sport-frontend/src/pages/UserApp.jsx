@@ -1464,10 +1464,11 @@ function ParticipantsPanel({ workout, onOpenUser, currentUserId }) {
     stats: {},
   }
   const participants = workout.participants || []
+  const participantCount = Number(workout.confirmedCount ?? participants.length)
 
   return (
     <div className="rt-panel">
-      <SectionHead title="Участники" caption={`${participants.length} подтверждено`} />
+      <SectionHead title="Участники" caption={`${participantCount} подтверждено`} />
       <div className="rt-participant-list">
         <UserListItem
           user={organizer}
@@ -1485,7 +1486,9 @@ function ParticipantsPanel({ workout, onOpenUser, currentUserId }) {
           />
         ))}
       </div>
-      {!participants.length && <p className="rt-muted">Подтвержденных участников пока нет.</p>}
+      {!workout.participantsHidden && !participants.length && (
+        <p className="rt-muted">Подтвержденных участников пока нет.</p>
+      )}
     </div>
   )
 }

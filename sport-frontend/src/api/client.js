@@ -8,9 +8,56 @@ const STALE_TIME = {
 }
 
 const responseCache = new Map()
+let refreshPromise = null
+
+async function fetchJson(path, fetchOptions = {}) {
+  const isFormData = fetchOptions.body instanceof FormData
+  const response = await fetch(`${API_BASE}${path}`, {
+    credentials: 'include',
+    headers: isFormData
+      ? { ...(fetchOptions.headers || {}) }
+      : {
+          'Content-Type': 'application/json',
+          ...(fetchOptions.headers || {}),
+        },
+    ...fetchOptions,
+  })
+
+  if (response.status === 204) return null
+
+  const data = await response.json().catch(() => ({}))
+  if (!response.ok) {
+    const error = new Error(data.error || 'Request error')
+    error.status = response.status
+    error.data = data
+    throw error
+  }
+
+  return data
+}
+
+function refreshSession() {
+  if (!refreshPromise) {
+    refreshPromise = request('/api/auth/refresh', {
+      method: 'POST',
+      skipAuthRefresh: true,
+    }).finally(() => {
+      refreshPromise = null
+    })
+  }
+
+  return refreshPromise
+}
+
+function canRefreshAuth(path, skipAuthRefresh) {
+  return (
+    !skipAuthRefresh &&
+    !['/api/auth/login', '/api/auth/register', '/api/auth/refresh'].includes(path)
+  )
+}
 
 async function request(path, options = {}) {
-  const { staleTime = 0, ...fetchOptions } = options
+  const { staleTime = 0, skipAuthRefresh = false, ...fetchOptions } = options
   const method = (fetchOptions.method || 'GET').toUpperCase()
   const shouldCache = method === 'GET' && staleTime > 0 && !fetchOptions.signal
   const cacheKey = path
@@ -25,25 +72,13 @@ async function request(path, options = {}) {
     }
   }
 
-  const isFormData = fetchOptions.body instanceof FormData
-  const promise = fetch(`${API_BASE}${path}`, {
-    credentials: 'include',
-    headers: isFormData
-      ? { ...(fetchOptions.headers || {}) }
-      : {
-          'Content-Type': 'application/json',
-          ...(fetchOptions.headers || {}),
-        },
-    ...fetchOptions,
-  })
-    .then(async (response) => {
-      if (response.status === 204) return null
-
-      const data = await response.json().catch(() => ({}))
-      if (!response.ok) {
-        throw new Error(data.error || 'Ошибка запроса')
+  const promise = fetchJson(path, fetchOptions)
+    .catch(async (error) => {
+      if (error.status === 401 && canRefreshAuth(path, skipAuthRefresh)) {
+        await refreshSession()
+        return fetchJson(path, fetchOptions)
       }
-      return data
+      throw error
     })
     .then((data) => {
       if (shouldCache) {

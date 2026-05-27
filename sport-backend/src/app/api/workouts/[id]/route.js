@@ -47,7 +47,7 @@ export const GET = route(async (request, context) => {
     [id, user.id]
   )
   if (!rows[0]) throw notFound('Тренировка не найдена')
-  return json({ workout: workoutPayload(rows[0]) })
+  return json({ workout: workoutPayload(rows[0], user) })
 })
 
 export const PATCH = route(async (request, context) => {
@@ -101,5 +101,5 @@ export const PATCH = route(async (request, context) => {
     return rows[0]
   })
 
-  return json({ workout: workoutPayload(updated) })
+  return json({ workout: workoutPayload(updated, user) })
 })
