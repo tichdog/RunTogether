@@ -46,9 +46,10 @@ function Toggle({ value, onChange, label, sub }) {
   )
 }
 
-export function Settings() {
+export function Settings({ currentUser }) {
   const [settings, setSettings] = useState(null)
   const [message, setMessage] = useState('')
+  const isSuperAdmin = currentUser?.role === 'super_admin'
 
   useEffect(() => {
     api
@@ -119,6 +120,24 @@ export function Settings() {
               type="number"
               value={settings.auto_block_complaints_count}
               onChange={(e) => set('auto_block_complaints_count')(Number(e.target.value))}
+              style={{ width: 90 }}
+            />
+          </label>
+          <label style={numberRow}>
+            <span>
+              Хранить архив тренировок, дней
+              {!isSuperAdmin && (
+                <small style={{ display: 'block', color: T.textMuted, marginTop: 3 }}>
+                  Менять может только супер-админ
+                </small>
+              )}
+            </span>
+            <Input
+              type="number"
+              value={settings.workout_archive_retention_days}
+              min={1}
+              disabled={!isSuperAdmin}
+              onChange={(e) => set('workout_archive_retention_days')(Number(e.target.value))}
               style={{ width: 90 }}
             />
           </label>

@@ -71,7 +71,7 @@ export function Overview({ setActive, setSelectedUser, currentUserId }) {
         ))}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: 16 }}>
+      <div className="overview-content-grid">
         <Card>
           <div
             style={{
@@ -92,16 +92,18 @@ export function Overview({ setActive, setSelectedUser, currentUserId }) {
           {users.slice(0, 5).map((user) => (
             <div
               key={user.id}
+              className="overview-user-row"
               style={{
                 display: 'grid',
-                gridTemplateColumns: '1fr 120px 110px 90px',
-                gap: 8,
                 alignItems: 'center',
                 padding: '10px 0',
                 borderBottom: `1px solid ${T.border}`,
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+              <div
+                className="overview-user-cell"
+                style={{ display: 'flex', alignItems: 'center', gap: 9 }}
+              >
                 <Avatar initials={user.initials} src={user.avatarUrl} size={30} />
                 <button
                   onClick={() => {
@@ -121,9 +123,15 @@ export function Overview({ setActive, setSelectedUser, currentUserId }) {
                   {user.name}
                 </button>
               </div>
-              <Badge text={ROLE_LABELS[user.role]} colors={ROLE_COLORS[user.role]} />
-              <StatusBadge status={user.status} />
-              <ReportUserButton user={user} currentUserId={currentUserId} compact />
+              <div className="overview-row-badge">
+                <Badge text={ROLE_LABELS[user.role]} colors={ROLE_COLORS[user.role]} />
+              </div>
+              <div className="overview-row-badge">
+                <StatusBadge status={user.status} />
+              </div>
+              <div className="overview-row-action">
+                <ReportUserButton user={user} currentUserId={currentUserId} compact />
+              </div>
             </div>
           ))}
           {!users.length && <EmptyState>Пользователей пока нет.</EmptyState>}

@@ -2,7 +2,10 @@ import { requireAdmin, requireAuth } from '@/lib/server/auth'
 import { query, transaction } from '@/lib/server/db'
 import { badRequest, notFound } from '@/lib/server/http-error'
 import { json, noContent, readJson, route } from '@/lib/server/response'
-import { evaluateAchievementsForAllUsers } from '@/lib/services/achievements'
+import {
+  clearAchievementsCache,
+  evaluateAchievementsForAllUsers,
+} from '@/lib/services/achievements'
 import { normalizeAchievementPayload } from '@/lib/services/achievement-definitions'
 
 export const PATCH = route(async (request, context) => {
@@ -41,6 +44,7 @@ export const PATCH = route(async (request, context) => {
       return rows[0]
     })
 
+    clearAchievementsCache()
     return json({ achievement })
   } catch (error) {
     if (error.code === '23505') throw badRequest('Достижение с таким кодом уже существует')
@@ -56,5 +60,6 @@ export const DELETE = route(async (request, context) => {
   const { rowCount } = await query('delete from achievements where id = $1', [id])
   if (!rowCount) throw notFound('Достижение не найдено')
 
+  clearAchievementsCache()
   return noContent()
 })

@@ -20,14 +20,32 @@ export const PATCH = route(async (request, context) => {
   requireAdmin(user)
   const { id } = await context.params
   const body = await readJson(request)
+  const action = String(body.action || 'block').trim()
   const target = await getUserRole(id)
 
+  if (!['block', 'unblock'].includes(action)) {
+    throw badRequest('Некорректное действие модерации')
+  }
   if (!target) throw notFound('Пользователь не найден')
   if (Number(target.id) === Number(user.id)) {
     throw badRequest('Нельзя заблокировать самого себя')
   }
   if (isAdmin(target) && user.role !== 'super_admin') {
     throw forbidden('Блокировать админов может только супер-админ')
+  }
+
+  if (action === 'unblock') {
+    const { rows } = await query(
+      `update users
+          set account_status = 'active',
+              blocked_until = null,
+              block_reason = null,
+              updated_at = now()
+        where id = $1
+        returning *`,
+      [id]
+    )
+    return json({ user: publicUser(rows[0], { viewer: user }) })
   }
 
   const banUntil = banUntilFromBody(body)

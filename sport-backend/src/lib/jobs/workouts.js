@@ -1,5 +1,6 @@
 import { pool, query } from '../server/db'
 import { createNotification } from '../services/notifications'
+import { getSettings } from '../services/settings'
 import { syncWorkoutStatus } from '../services/workouts'
 
 export async function createReminderNotifications() {
@@ -38,10 +39,22 @@ export async function createReminderNotifications() {
 
 export async function syncActiveWorkoutStatuses() {
   const { rows } = await query(
-    "select id from workouts where status not in ('cancelled', 'completed')"
+    "select id from workouts where status not in ('cancelled', 'archived')"
   )
   for (const row of rows) {
     await syncWorkoutStatus(pool, row.id)
   }
   return rows.length
+}
+
+export async function deleteExpiredArchivedWorkouts() {
+  const settings = await getSettings()
+  const retentionDays = Math.max(1, Number(settings.workout_archive_retention_days) || 90)
+  const { rowCount } = await query(
+    `delete from workouts
+      where status = 'archived'
+        and updated_at < now() - ($1::int || ' days')::interval`,
+    [retentionDays]
+  )
+  return rowCount
 }

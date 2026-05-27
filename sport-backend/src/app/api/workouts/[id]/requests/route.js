@@ -4,6 +4,7 @@ import { badRequest, forbidden, notFound } from '@/lib/server/http-error'
 import { json, route } from '@/lib/server/response'
 import { createNotification } from '@/lib/services/notifications'
 import { getWorkoutRow, isOwnerOrAdmin } from '@/lib/repositories/workouts'
+import { syncWorkoutStatus } from '@/lib/services/workouts'
 import {
   findParticipationConflict,
   lockParticipationForUser,
@@ -16,6 +17,8 @@ export const POST = route(async (request, context) => {
   const participant = await transaction(async (client) => {
     const workout = await getWorkoutRow(client, id, true)
     if (!workout) throw notFound('Тренировка не найдена')
+    const synced = await syncWorkoutStatus(client, id)
+    workout.status = synced?.status || workout.status
     if (Number(workout.organizer_id) === Number(user.id))
       throw badRequest('Организатор уже участвует в тренировке')
     if (!['open', 'planned'].includes(workout.status)) throw badRequest('Набор закрыт')

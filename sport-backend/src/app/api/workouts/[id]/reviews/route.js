@@ -15,7 +15,7 @@ export const GET = route(async (request, context) => {
     `select 1
        from workouts w
       where w.id = $1
-        and w.status = 'completed'
+        and w.status in ('completed', 'archived')
         and (
           w.organizer_id = $2
           or exists (
@@ -109,7 +109,7 @@ export const POST = route(async (request, context) => {
                    and wp.status = 'confirmed'
               ) as reviewee_is_participant
          from workouts w
-        where w.id = $1 and w.status = 'completed'`,
+        where w.id = $1 and w.status in ('completed', 'archived')`,
       [id, user.id, revieweeId]
     )
 

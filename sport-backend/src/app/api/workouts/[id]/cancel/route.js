@@ -14,7 +14,8 @@ export const POST = route(async (request, context) => {
     const workout = await getWorkoutRow(client, id, true)
     if (!workout) throw notFound('Тренировка не найдена')
     if (!isOwnerOrAdmin(user, workout)) throw forbidden()
-    if (workout.status === 'completed') throw badRequest('Завершенную тренировку нельзя отменить')
+    if (['completed', 'archived'].includes(workout.status))
+      throw badRequest('Завершенную тренировку нельзя отменить')
 
     const { rows } = await client.query(
       `update workouts

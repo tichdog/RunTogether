@@ -1,13 +1,16 @@
 import { query } from '../server/db'
 import { evaluateAchievements } from './achievements'
 
-const TERMINAL = new Set(['cancelled', 'completed'])
+const TERMINAL = new Set(['cancelled', 'archived'])
+const ARCHIVE_AFTER_MS = 24 * 60 * 60 * 1000
 
 export function deriveWorkoutStatus(workout, confirmedCount = 0, now = new Date()) {
   if (!workout || workout.status === 'cancelled') return workout?.status
   const start = new Date(workout.start_at)
   const end = new Date(start.getTime() + Number(workout.duration_minutes || 60) * 60000)
+  const archiveAt = new Date(end.getTime() + ARCHIVE_AFTER_MS)
 
+  if (now >= archiveAt) return 'archived'
   if (now >= end) return 'completed'
   if (now >= start) return 'in_progress'
   if (Number(confirmedCount) >= Number(workout.participant_limit)) return 'full'
@@ -38,7 +41,10 @@ export async function syncWorkoutStatus(clientOrPool, workoutId) {
       'update workouts set status = $2, updated_at = now() where id = $1 returning *',
       [workoutId, nextStatus]
     )
-    if (nextStatus === 'completed') {
+    if (
+      nextStatus === 'completed' ||
+      (nextStatus === 'archived' && workout.status !== 'completed')
+    ) {
       await evaluateWorkoutAchievements(achievementClient, workoutId)
     }
     return updated.rows[0]
@@ -66,6 +72,7 @@ async function evaluateWorkoutAchievements(client, workoutId) {
 
 export function workoutPayload(row) {
   const confirmed = Number(row.confirmed_count || 0)
+  const status = row.status === 'archived' ? 'completed' : row.status
   return {
     id: row.id,
     organizerId: row.organizer_id,
@@ -92,7 +99,8 @@ export function workoutPayload(row) {
     participantLimit: Number(row.participant_limit),
     confirmedCount: confirmed,
     freePlaces: Math.max(0, Number(row.participant_limit) - confirmed),
-    status: row.status,
+    status,
+    archived: row.status === 'archived',
     participantStatus: row.participant_status || null,
     participantRequestId:
       row.participant_request_id == null ? null : Number(row.participant_request_id),

@@ -54,7 +54,7 @@ create table if not exists workouts (
   pace_min_per_km numeric(4,2) not null check (pace_min_per_km > 0),
   difficulty text not null check (difficulty in ('easy', 'medium', 'hard')),
   participant_limit integer not null check (participant_limit > 0),
-  status text not null default 'open' check (status in ('planned', 'open', 'full', 'in_progress', 'completed', 'cancelled')),
+  status text not null default 'open' check (status in ('planned', 'open', 'full', 'in_progress', 'completed', 'archived', 'cancelled')),
   cancellation_reason text,
   cancelled_at timestamptz,
   created_at timestamptz not null default now(),
@@ -162,12 +162,15 @@ create index if not exists idx_workout_participants_user on workout_participants
 create index if not exists idx_notifications_user_read on notifications(user_id, read_at);
 create index if not exists idx_reports_status on reports(status);
 
+alter table workouts drop constraint if exists workouts_status_check;
+alter table workouts add constraint workouts_status_check check (status in ('planned', 'open', 'full', 'in_progress', 'completed', 'archived', 'cancelled'));
+
 create or replace view user_training_stats as
 select
   u.id as user_id,
-  count(distinct organized.id) filter (where organized.status = 'completed') as organized_workouts,
-  count(distinct attended.id) filter (where attended.status = 'completed') as attended_workouts,
-  coalesce(sum(attended.distance_km) filter (where attended.status = 'completed'), 0) as total_distance_km,
+  count(distinct organized.id) filter (where organized.status in ('completed', 'archived')) as organized_workouts,
+  count(distinct attended.id) filter (where attended.status in ('completed', 'archived')) as attended_workouts,
+  coalesce(sum(attended.distance_km) filter (where attended.status in ('completed', 'archived')), 0) as total_distance_km,
   round(avg(r.rating)::numeric, 2) as average_rating,
   count(distinct rep.id) as complaints_count
 from users u
@@ -183,7 +186,8 @@ insert into system_settings (key, value) values
   ('require_email_verification', 'false'),
   ('require_phone_verification', 'false'),
   ('default_participant_limit', '20'),
-  ('auto_block_complaints_count', '10')
+  ('auto_block_complaints_count', '10'),
+  ('workout_archive_retention_days', '90')
 on conflict (key) do nothing;
 
 insert into achievements (code, title, description, icon, condition) values

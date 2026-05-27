@@ -25,6 +25,11 @@ export const PATCH = route(async (request, context) => {
     const workout = await getWorkoutRow(client, id, true)
     if (!workout) throw notFound('Тренировка не найдена')
     if (!isOwnerOrAdmin(user, workout)) throw forbidden()
+    const syncedWorkout = await syncWorkoutStatus(client, id)
+    workout.status = syncedWorkout?.status || workout.status
+    if (!['open', 'planned', 'full'].includes(workout.status)) {
+      throw badRequest('Нельзя изменять заявки после завершения тренировки')
+    }
 
     let existingRequest
 

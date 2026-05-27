@@ -1,17 +1,47 @@
 import { createNotification } from './notifications'
+import { query } from '../server/db'
+
+const ACHIEVEMENTS_CACHE_TTL_MS = 60_000
+let adminAchievementsCache = null
+
+export function clearAchievementsCache() {
+  adminAchievementsCache = null
+}
+
+export async function getAdminAchievements() {
+  if (adminAchievementsCache && adminAchievementsCache.expiresAt > Date.now()) {
+    return adminAchievementsCache.value.map((achievement) => ({ ...achievement }))
+  }
+
+  const { rows } = await query(
+    `select a.*,
+            count(ua.user_id)::int as earned_count
+       from achievements a
+       left join user_achievements ua on ua.achievement_id = a.id
+      group by a.id
+      order by a.id desc`
+  )
+
+  adminAchievementsCache = {
+    value: rows,
+    expiresAt: Date.now() + ACHIEVEMENTS_CACHE_TTL_MS,
+  }
+
+  return rows.map((achievement) => ({ ...achievement }))
+}
 
 export async function evaluateAchievements(client, userId) {
   const { rows: achievements } = await client.query('select * from achievements')
   const { rows } = await client.query(
     `select
-       count(distinct wp.workout_id) filter (where wp.status = 'confirmed' and w.status = 'completed') as completed_count,
-       coalesce(sum(w.distance_km) filter (where wp.status = 'confirmed' and w.status = 'completed'), 0) as distance_sum,
-       count(distinct wp.workout_id) filter (where wp.status = 'confirmed' and w.status = 'completed' and extract(hour from w.start_at) < 9) as morning_count,
+       count(distinct wp.workout_id) filter (where wp.status = 'confirmed' and w.status in ('completed', 'archived')) as completed_count,
+       coalesce(sum(w.distance_km) filter (where wp.status = 'confirmed' and w.status in ('completed', 'archived')), 0) as distance_sum,
+       count(distinct wp.workout_id) filter (where wp.status = 'confirmed' and w.status in ('completed', 'archived') and extract(hour from w.start_at) < 9) as morning_count,
        (
          select count(*)::int
            from workouts organized
           where organized.organizer_id = $1
-            and organized.status = 'completed'
+            and organized.status in ('completed', 'archived')
        ) as organized_count
      from workout_participants wp
      join workouts w on w.id = wp.workout_id
@@ -44,6 +74,7 @@ export async function evaluateAchievements(client, userId) {
     )
 
     if (inserted.rowCount) {
+      clearAchievementsCache()
       earned.push(achievement)
       await client.query(
         `insert into activity_feed (type, actor_id, achievement_id, metadata)

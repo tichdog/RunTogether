@@ -13,7 +13,7 @@ export const GET = route(async (request, context) => {
             coalesce(sum(w.distance_km), 0) as distance_km
        from workout_participants wp
        join workouts w on w.id = wp.workout_id
-      where wp.user_id = $1 and wp.status = 'confirmed' and w.status = 'completed'
+      where wp.user_id = $1 and wp.status = 'confirmed' and w.status in ('completed', 'archived')
       group by 1
       order by 1 desc`,
     [id]

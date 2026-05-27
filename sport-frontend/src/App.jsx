@@ -255,7 +255,7 @@ export default function App() {
         )}
         {active === 'Жалобы' && <Reports onSelectUser={openAdminUser} />}
         {active === 'Достижения' && <Achievements />}
-        {active === 'Настройки' && <Settings />}
+        {active === 'Настройки' && <Settings currentUser={user} />}
       </main>
     </div>
   )

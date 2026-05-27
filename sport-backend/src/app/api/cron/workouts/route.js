@@ -1,7 +1,11 @@
 import { env } from '@/lib/server/env'
 import { HttpError } from '@/lib/server/http-error'
 import { json, route } from '@/lib/server/response'
-import { createReminderNotifications, syncActiveWorkoutStatuses } from '@/lib/jobs/workouts'
+import {
+  createReminderNotifications,
+  deleteExpiredArchivedWorkouts,
+  syncActiveWorkoutStatuses,
+} from '@/lib/jobs/workouts'
 
 function assertCronAccess(request) {
   if (!env.cronSecret) return
@@ -14,10 +18,11 @@ function assertCronAccess(request) {
 
 export const POST = route(async (request) => {
   assertCronAccess(request)
-  const [syncedWorkouts, remindersCreated] = await Promise.all([
-    syncActiveWorkoutStatuses(),
+  const syncedWorkouts = await syncActiveWorkoutStatuses()
+  const [remindersCreated, archivedDeleted] = await Promise.all([
     createReminderNotifications(),
+    deleteExpiredArchivedWorkouts(),
   ])
 
-  return json({ ok: true, syncedWorkouts, remindersCreated })
+  return json({ ok: true, syncedWorkouts, remindersCreated, archivedDeleted })
 })

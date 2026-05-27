@@ -53,8 +53,11 @@ export function Badge({ text, colors }) {
   )
 }
 
-export function StatusBadge({ status }) {
-  const s = STATUS_STYLES[status] || { bg: '#F3F4F6', text: '#374151', dot: '#9CA3AF' }
+export function StatusBadge({ status, participantStatus }) {
+  const isFinished = ['completed', 'archived'].includes(status)
+  const visibleStatus = status === 'archived' ? 'completed' : status
+  const s = STATUS_STYLES[visibleStatus] || { bg: '#F3F4F6', text: '#374151', dot: '#9CA3AF' }
+  const participantMark = isFinished && participantStatus === 'confirmed' ? ' · вы участвовали' : ''
   return (
     <span
       style={{
@@ -79,7 +82,7 @@ export function StatusBadge({ status }) {
       <span
         style={{ width: 7, height: 7, borderRadius: '50%', background: s.dot, flexShrink: 0 }}
       />
-      {STATUS_LABELS[status] || status}
+      {(STATUS_LABELS[visibleStatus] || visibleStatus) + participantMark}
     </span>
   )
 }
@@ -153,6 +156,9 @@ export function Input({
   style: extra,
   required,
   disabled,
+  min,
+  max,
+  step,
 }) {
   return (
     <input
@@ -162,6 +168,9 @@ export function Input({
       placeholder={placeholder}
       required={required}
       disabled={disabled}
+      min={min}
+      max={max}
+      step={step}
       style={{
         background: T.surface,
         border: `1px solid ${T.border}`,

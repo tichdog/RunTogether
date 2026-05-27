@@ -7,6 +7,7 @@ const EMPTY_FILTERS = {
   query: '',
   difficulty: '',
   sort: 'time',
+  view: 'active',
 }
 
 const NAME_RE = /^\p{L}{2,15}$/u
@@ -169,6 +170,8 @@ export function UserApp({ user, onLogout }) {
   const [loading, setLoading] = useState(true)
   const [profileLoading, setProfileLoading] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [notificationsSaving, setNotificationsSaving] = useState(false)
+  const [cancelWorkoutDraft, setCancelWorkoutDraft] = useState(null)
   const [message, setMessage] = useState(null)
   const { activeTab, screen: routeScreen, selectedId, mode } = route
 
@@ -203,7 +206,7 @@ export function UserApp({ user, onLogout }) {
     () =>
       workouts
         .filter((workout) => Number(workout.organizerId) === Number(currentUser.id))
-        .sort((left, right) => new Date(right.createdAt || 0) - new Date(left.createdAt || 0)),
+        .sort(sortWorkoutsNewestFirst),
     [currentUser.id, workouts]
   )
 
@@ -215,11 +218,7 @@ export function UserApp({ user, onLogout }) {
             Number(workout.organizerId) !== Number(currentUser.id) &&
             ['pending', 'confirmed'].includes(workout.participantStatus)
         )
-        .sort((left, right) => {
-          const leftConfirmed = left.participantStatus === 'confirmed' ? 0 : 1
-          const rightConfirmed = right.participantStatus === 'confirmed' ? 0 : 1
-          return leftConfirmed - rightConfirmed || new Date(left.startAt) - new Date(right.startAt)
-        }),
+        .sort(sortWorkoutsNewestFirst),
     [currentUser.id, workouts]
   )
 
@@ -256,26 +255,49 @@ export function UserApp({ user, onLogout }) {
     }
   }, [])
 
-  const loadWorkouts = useCallback(async () => {
-    setLoading(true)
-    setMessage(null)
-    try {
-      const data = await api.workouts({
-        difficulty: filters.difficulty,
-        sort: filters.sort,
-      })
-      setWorkouts(data.workouts || [])
-      refreshCurrentUser().catch(() => {})
-      loadNotifications()
-    } catch (error) {
-      setMessage({ type: 'error', text: error.message })
-    } finally {
-      setLoading(false)
-    }
-  }, [filters.difficulty, filters.sort, loadNotifications, refreshCurrentUser])
+  const loadWorkouts = useCallback(
+    async ({ silent = false } = {}) => {
+      if (!silent) {
+        setLoading(true)
+        setMessage(null)
+      }
+      try {
+        const data = await api.workouts({
+          difficulty: filters.difficulty,
+          sort: filters.sort,
+          archiveOnly: filters.view === 'archive' || undefined,
+        })
+        setWorkouts(data.workouts || [])
+        refreshCurrentUser().catch(() => {})
+        loadNotifications()
+      } catch (error) {
+        if (!silent) setMessage({ type: 'error', text: error.message })
+      } finally {
+        if (!silent) setLoading(false)
+      }
+    },
+    [filters.difficulty, filters.sort, filters.view, loadNotifications, refreshCurrentUser]
+  )
 
   useEffect(() => {
     loadWorkouts()
+  }, [loadWorkouts])
+
+  useEffect(() => {
+    const refresh = () => {
+      if (document.visibilityState === 'visible') {
+        loadWorkouts({ silent: true })
+      }
+    }
+    const timer = window.setInterval(refresh, 15000)
+
+    window.addEventListener('focus', refresh)
+    document.addEventListener('visibilitychange', refresh)
+    return () => {
+      window.clearInterval(timer)
+      window.removeEventListener('focus', refresh)
+      document.removeEventListener('visibilitychange', refresh)
+    }
   }, [loadWorkouts])
 
   useEffect(() => {
@@ -512,13 +534,31 @@ export function UserApp({ user, onLogout }) {
 
   const cancelWorkout = async () => {
     if (!selectedWorkout) return
-    const reason = window.prompt('Причина отмены', 'Отменено организатором')
-    if (reason === null) return
+    setCancelWorkoutDraft({
+      workout: selectedWorkout,
+      reason: 'Отменено организатором',
+    })
+  }
+
+  const closeCancelWorkoutDialog = () => {
+    if (saving) return
+    setCancelWorkoutDraft(null)
+  }
+
+  const confirmCancelWorkout = async (event) => {
+    event.preventDefault()
+    if (!cancelWorkoutDraft?.workout) return
+    const reason = cancelWorkoutDraft.reason.trim()
+    if (!reason) {
+      setMessage({ type: 'error', text: 'Укажите причину отмены' })
+      return
+    }
     setSaving(true)
     setMessage(null)
     try {
-      await api.cancelWorkout(selectedWorkout.id, reason)
+      await api.cancelWorkout(cancelWorkoutDraft.workout.id, reason)
       await loadWorkouts()
+      setCancelWorkoutDraft(null)
       setMessage({ type: 'success', text: 'Тренировка отменена' })
     } catch (error) {
       setMessage({ type: 'error', text: error.message })
@@ -578,6 +618,18 @@ export function UserApp({ user, onLogout }) {
       )
     } catch (error) {
       setMessage({ type: 'error', text: error.message })
+    }
+  }
+
+  const markAllNotificationsRead = async () => {
+    setNotificationsSaving(true)
+    try {
+      const data = await api.readAllNotifications()
+      setNotifications(data.notifications || [])
+    } catch (error) {
+      setMessage({ type: 'error', text: error.message })
+    } finally {
+      setNotificationsSaving(false)
     }
   }
 
@@ -739,6 +791,8 @@ export function UserApp({ user, onLogout }) {
         {screen === 'participating' && (
           <ParticipatingWorkoutsScreen
             workouts={participatingWorkouts}
+            filters={filters}
+            setFilters={setFilters}
             loading={loading}
             saving={saving}
             onOpen={(workout) => navigate(`/participating/${workout.id}`)}
@@ -820,7 +874,12 @@ export function UserApp({ user, onLogout }) {
         )}
 
         {screen === 'notifications' && (
-          <NotificationsScreen notifications={notifications} onRead={markNotificationRead} />
+          <NotificationsScreen
+            notifications={notifications}
+            readingAll={notificationsSaving}
+            onRead={markNotificationRead}
+            onReadAll={markAllNotificationsRead}
+          />
         )}
 
         {screen === 'userProfile' && (
@@ -833,9 +892,64 @@ export function UserApp({ user, onLogout }) {
         )}
       </main>
 
+      <CancelWorkoutDialog
+        draft={cancelWorkoutDraft}
+        saving={saving}
+        onReasonChange={(reason) =>
+          setCancelWorkoutDraft((prev) => (prev ? { ...prev, reason } : prev))
+        }
+        onClose={closeCancelWorkoutDialog}
+        onSubmit={confirmCancelWorkout}
+      />
+
       <nav className="rt-bottom-nav" aria-label="Основная навигация">
         <NavItems active={activeTab} onChange={goTab} compact unreadCount={unreadNotifications} />
       </nav>
+    </div>
+  )
+}
+
+function CancelWorkoutDialog({ draft, saving, onReasonChange, onClose, onSubmit }) {
+  if (!draft?.workout) return null
+
+  return (
+    <div className="rt-modal-overlay" role="presentation" onClick={onClose}>
+      <form
+        className="rt-cancel-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="rt-cancel-title"
+        onSubmit={onSubmit}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="rt-cancel-dialog-icon">!</div>
+        <div>
+          <h2 id="rt-cancel-title">Отменить тренировку?</h2>
+          <p>
+            Тренировка «{draft.workout.title}» будет закрыта для заявок. Участники получат
+            уведомление с причиной отмены.
+          </p>
+        </div>
+        <label>
+          <span>Причина отмены</span>
+          <textarea
+            value={draft.reason}
+            onChange={(event) => onReasonChange(event.target.value)}
+            rows={4}
+            required
+            autoFocus
+            placeholder="Например: перенос из-за погоды"
+          />
+        </label>
+        <div className="rt-cancel-dialog-actions">
+          <button className="rt-secondary" type="button" disabled={saving} onClick={onClose}>
+            Оставить тренировку
+          </button>
+          <button className="rt-danger" type="submit" disabled={saving || !draft.reason.trim()}>
+            {saving ? 'Отменяем...' : 'Отменить тренировку'}
+          </button>
+        </div>
+      </form>
     </div>
   )
 }
@@ -971,6 +1085,22 @@ function WorkoutsScreen({
           <option value="time">По времени</option>
           <option value="distance">По расстоянию</option>
         </select>
+        <div className="rt-view-toggle" aria-label="Фильтр архива тренировок">
+          <button
+            className={filters.view === 'active' ? 'active' : ''}
+            type="button"
+            onClick={() => setFilters((prev) => ({ ...prev, view: 'active' }))}
+          >
+            Активные
+          </button>
+          <button
+            className={filters.view === 'archive' ? 'active' : ''}
+            type="button"
+            onClick={() => setFilters((prev) => ({ ...prev, view: 'archive' }))}
+          >
+            Архив
+          </button>
+        </div>
       </div>
 
       <SectionHead
@@ -1014,11 +1144,20 @@ function OrganizedWorkoutsScreen({ workouts, loading, onOpen, onCreate }) {
   )
 }
 
-function ParticipatingWorkoutsScreen({ workouts, loading, saving, onOpen, onLeave }) {
+function ParticipatingWorkoutsScreen({
+  workouts,
+  filters,
+  setFilters,
+  loading,
+  saving,
+  onOpen,
+  onLeave,
+}) {
   const confirmedCount = workouts.filter(
     (workout) => workout.participantStatus === 'confirmed'
   ).length
   const pendingCount = workouts.filter((workout) => workout.participantStatus === 'pending').length
+  const isArchive = filters.view === 'archive'
 
   return (
     <section className="rt-page">
@@ -1028,9 +1167,27 @@ function ParticipatingWorkoutsScreen({ workouts, loading, saving, onOpen, onLeav
           caption={
             loading
               ? 'Загружаем...'
-              : `${confirmedCount} подтверждено · ${pendingCount} на рассмотрении`
+              : isArchive
+                ? `${workouts.length} в архиве`
+                : `${confirmedCount} подтверждено · ${pendingCount} на рассмотрении`
           }
         />
+        <div className="rt-view-toggle" aria-label="Фильтр архива участий">
+          <button
+            className={!isArchive ? 'active' : ''}
+            type="button"
+            onClick={() => setFilters((prev) => ({ ...prev, view: 'active' }))}
+          >
+            Активные
+          </button>
+          <button
+            className={isArchive ? 'active' : ''}
+            type="button"
+            onClick={() => setFilters((prev) => ({ ...prev, view: 'archive' }))}
+          >
+            Архив
+          </button>
+        </div>
       </div>
       <WorkoutList
         workouts={workouts}
@@ -1057,7 +1214,9 @@ function WorkoutDetail({
   const canJoin =
     isJoinableStatus(workout.status) &&
     !['pending', 'confirmed'].includes(workout.participantStatus)
-  const canLeave = ['pending', 'confirmed'].includes(workout.participantStatus)
+  const canLeave =
+    !['completed', 'cancelled'].includes(workout.status) &&
+    ['pending', 'confirmed'].includes(workout.participantStatus)
 
   return (
     <section className="rt-page">
@@ -1661,13 +1820,22 @@ function ModerationNoticeList({ user, notifications = [] }) {
   )
 }
 
-function NotificationsScreen({ notifications, onRead }) {
+function NotificationsScreen({ notifications, readingAll, onRead, onReadAll }) {
+  const unreadCount = notifications.filter((item) => !item.read_at).length
+
   return (
     <section className="rt-page">
-      <SectionHead
-        title="Уведомления"
-        caption={`${notifications.filter((item) => !item.read_at).length} новых`}
-      />
+      <div className="rt-notification-head">
+        <SectionHead title="Уведомления" caption={`${unreadCount} новых`} />
+        <button
+          className="rt-secondary"
+          type="button"
+          disabled={!unreadCount || readingAll}
+          onClick={onReadAll}
+        >
+          {readingAll ? 'Обновляем...' : 'Прочитать все'}
+        </button>
+      </div>
       <div className="rt-notification-list">
         {notifications.map((notification) => (
           <NotificationItem
@@ -1741,7 +1909,10 @@ function WorkoutCard({ workout, userId, saving, onOpen, onJoin, onLeave }) {
     !isOrganizer &&
     isJoinableStatus(workout.status) &&
     !['pending', 'confirmed'].includes(workout.participantStatus)
-  const canLeave = onLeave && ['pending', 'confirmed'].includes(workout.participantStatus)
+  const canLeave =
+    onLeave &&
+    !['completed', 'cancelled'].includes(workout.status) &&
+    ['pending', 'confirmed'].includes(workout.participantStatus)
 
   return (
     <article className="rt-workout-card">
@@ -1936,9 +2107,14 @@ function Info({ label, value }) {
 }
 
 function StatusBadge({ status, participantStatus }) {
-  const ownStatus = participantStatus === 'cancelled' ? '' : participantStatus
-  const text = participantLabel(ownStatus) || statusLabel(status)
-  return <span className={`rt-status ${ownStatus || status}`}>{text}</span>
+  const isFinished = ['completed', 'archived'].includes(status)
+  const ownStatus = participantStatus === 'cancelled' || isFinished ? '' : participantStatus
+  const participantMark =
+    isFinished && participantStatus === 'confirmed' ? ` · ${participantFinishedLabel()}` : ''
+  const text = `${participantLabel(ownStatus) || statusLabel(status)}${participantMark}`
+  return (
+    <span className={`rt-status ${isFinished ? 'completed' : ownStatus || status}`}>{text}</span>
+  )
 }
 
 function Avatar({ user, large = false }) {
@@ -2038,6 +2214,12 @@ function formatRating(value) {
   return value ? Number(value).toFixed(1) : 'нет'
 }
 
+function sortWorkoutsNewestFirst(left, right) {
+  const leftDate = new Date(left.createdAt || left.startAt || 0).getTime()
+  const rightDate = new Date(right.createdAt || right.startAt || 0).getTime()
+  return rightDate - leftDate || Number(right.id || 0) - Number(left.id || 0)
+}
+
 function achievementIcon(value) {
   return (
     {
@@ -2079,9 +2261,14 @@ function statusLabel(status) {
       full: 'Мест нет',
       in_progress: 'Идет',
       completed: 'Завершена',
+      archived: 'Завершена',
       cancelled: 'Отменена',
     }[status] || status
   )
+}
+
+function participantFinishedLabel() {
+  return 'вы участвовали'
 }
 
 function participantLabel(status) {

@@ -25,23 +25,35 @@ export function Workouts({ selectedWorkoutId, onSelectWorkout, onBackToList, cur
   const [search, setSearch] = useState('')
   const [difficulty, setDifficulty] = useState('')
   const [sort, setSort] = useState('time')
+  const [showArchive, setShowArchive] = useState(false)
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState(() => initialForm())
   const [defaultParticipantLimit, setDefaultParticipantLimit] = useState(20)
   const [message, setMessage] = useState('')
   const [loadingDetail, setLoadingDetail] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [cancelTarget, setCancelTarget] = useState(null)
+  const [cancelReason, setCancelReason] = useState('Отменено администратором')
+  const [cancelSaving, setCancelSaving] = useState(false)
 
-  const load = useCallback(() => {
-    api
-      .workouts({ difficulty, sort })
-      .then((data) => setWorkouts(data.workouts || []))
-      .catch((err) => setMessage(err.message))
-  }, [difficulty, sort])
+  const load = useCallback(
+    ({ silent = false } = {}) => {
+      if (!silent) setMessage('')
+      api
+        .workouts({ difficulty, sort, includeArchived: showArchive || undefined })
+        .then((data) => setWorkouts(data.workouts || []))
+        .catch((err) => {
+          if (!silent) setMessage(err.message)
+        })
+    },
+    [difficulty, showArchive, sort]
+  )
 
-  const loadWorkoutDetail = useCallback(async (id) => {
-    setLoadingDetail(true)
-    setMessage('')
+  const loadWorkoutDetail = useCallback(async (id, { silent = false } = {}) => {
+    if (!silent) {
+      setLoadingDetail(true)
+      setMessage('')
+    }
     try {
       const [workoutData, requestsData] = await Promise.all([
         api.workout(id),
@@ -52,15 +64,32 @@ export function Workouts({ selectedWorkoutId, onSelectWorkout, onBackToList, cur
     } catch (err) {
       setSelectedWorkout(null)
       setRequests([])
-      setMessage(err.message)
+      if (!silent) setMessage(err.message)
     } finally {
-      setLoadingDetail(false)
+      if (!silent) setLoadingDetail(false)
     }
   }, [])
 
   useEffect(() => {
     load()
   }, [load])
+
+  useEffect(() => {
+    const refresh = () => {
+      if (document.visibilityState !== 'visible') return
+      load({ silent: true })
+      if (selectedWorkoutId) loadWorkoutDetail(selectedWorkoutId, { silent: true })
+    }
+    const timer = window.setInterval(refresh, 15000)
+
+    window.addEventListener('focus', refresh)
+    document.addEventListener('visibilitychange', refresh)
+    return () => {
+      window.clearInterval(timer)
+      window.removeEventListener('focus', refresh)
+      document.removeEventListener('visibilitychange', refresh)
+    }
+  }, [load, loadWorkoutDetail, selectedWorkoutId])
 
   const loadDefaultParticipantLimit = useCallback(async () => {
     try {
@@ -133,16 +162,39 @@ export function Workouts({ selectedWorkoutId, onSelectWorkout, onBackToList, cur
     }
   }
 
-  const cancel = async (id) => {
-    const reason = window.prompt('Причина отмены', 'Отменено администратором')
-    if (reason === null) return
+  const cancel = (id) => {
+    const workout =
+      selectedWorkout && Number(selectedWorkout.id) === Number(id)
+        ? selectedWorkout
+        : workouts.find((item) => Number(item.id) === Number(id))
+    setCancelTarget(workout || { id })
+    setCancelReason('Отменено администратором')
+  }
+
+  const closeCancelDialog = () => {
+    if (cancelSaving) return
+    setCancelTarget(null)
+  }
+
+  const confirmCancel = async (event) => {
+    event.preventDefault()
+    if (!cancelTarget) return
+    const reason = cancelReason.trim()
+    if (!reason) {
+      setMessage('Укажите причину отмены')
+      return
+    }
+    setCancelSaving(true)
     setMessage('')
     try {
-      await api.cancelWorkout(id, reason)
+      await api.cancelWorkout(cancelTarget.id, reason)
+      setCancelTarget(null)
       load()
       if (selectedWorkoutId) loadWorkoutDetail(selectedWorkoutId)
     } catch (err) {
       setMessage(err.message)
+    } finally {
+      setCancelSaving(false)
     }
   }
 
@@ -181,19 +233,29 @@ export function Workouts({ selectedWorkoutId, onSelectWorkout, onBackToList, cur
 
   if (selectedWorkoutId) {
     return (
-      <WorkoutDetail
-        workout={selectedWorkout}
-        requests={requests}
-        loading={loadingDetail}
-        saving={saving}
-        message={message}
-        onBack={onBackToList}
-        onCancel={cancel}
-        onJoin={join}
-        onRespond={respondRequest}
-        onRemoveParticipant={removeParticipant}
-        currentUserId={currentUserId}
-      />
+      <>
+        <WorkoutDetail
+          workout={selectedWorkout}
+          requests={requests}
+          loading={loadingDetail}
+          saving={saving}
+          message={message}
+          onBack={onBackToList}
+          onCancel={cancel}
+          onJoin={join}
+          onRespond={respondRequest}
+          onRemoveParticipant={removeParticipant}
+          currentUserId={currentUserId}
+        />
+        <CancelWorkoutDialog
+          workout={cancelTarget}
+          reason={cancelReason}
+          saving={cancelSaving}
+          onReasonChange={setCancelReason}
+          onClose={closeCancelDialog}
+          onSubmit={confirmCancel}
+        />
+      </>
     )
   }
 
@@ -282,7 +344,7 @@ export function Workouts({ selectedWorkoutId, onSelectWorkout, onBackToList, cur
         </Card>
       )}
 
-      <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
         <Input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -299,6 +361,13 @@ export function Workouts({ selectedWorkoutId, onSelectWorkout, onBackToList, cur
           <option value="time">По времени</option>
           <option value="distance">По расстоянию</option>
         </Select>
+        <Btn
+          variant={showArchive ? 'primary' : 'default'}
+          onClick={() => setShowArchive((value) => !value)}
+          style={{ minWidth: 132 }}
+        >
+          {showArchive ? 'Скрыть архив' : 'Показать архив'}
+        </Btn>
       </div>
 
       {message && (
@@ -329,6 +398,7 @@ export function Workouts({ selectedWorkoutId, onSelectWorkout, onBackToList, cur
               <div style={{ fontSize: 12, color: T.textMuted }}>
                 {workout.distanceKm} км · {workout.paceMinPerKm} мин/км ·{' '}
                 {difficultyLabel(workout.difficulty)}
+                {workout.archived ? ' · Архив' : ''}
               </div>
             </div>
             <div>
@@ -345,7 +415,7 @@ export function Workouts({ selectedWorkoutId, onSelectWorkout, onBackToList, cur
             <div style={{ fontSize: 13 }}>
               {workout.confirmedCount} / {workout.participantLimit}
             </div>
-            <StatusBadge status={workout.status} />
+            <StatusBadge status={workout.status} participantStatus={workout.participantStatus} />
             <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
               <Btn onClick={() => onSelectWorkout?.(workout.id)}>Подробнее</Btn>
               <Btn
@@ -360,6 +430,14 @@ export function Workouts({ selectedWorkoutId, onSelectWorkout, onBackToList, cur
         ))}
         {!filtered.length && <EmptyState>Тренировки не найдены.</EmptyState>}
       </Card>
+      <CancelWorkoutDialog
+        workout={cancelTarget}
+        reason={cancelReason}
+        saving={cancelSaving}
+        onReasonChange={setCancelReason}
+        onClose={closeCancelDialog}
+        onSubmit={confirmCancel}
+      />
     </div>
   )
 }
@@ -454,7 +532,7 @@ function WorkoutDetail({
         >
           <div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10 }}>
-              <StatusBadge status={workout.status} />
+              <StatusBadge status={workout.status} participantStatus={workout.participantStatus} />
               <span style={{ fontSize: 12, color: T.textMuted }}>
                 {difficultyLabel(workout.difficulty)}
               </span>
@@ -587,6 +665,55 @@ function WorkoutDetail({
           )}
         </Card>
       </div>
+    </div>
+  )
+}
+
+function CancelWorkoutDialog({ workout, reason, saving, onReasonChange, onClose, onSubmit }) {
+  if (!workout) return null
+
+  return (
+    <div role="presentation" style={modalOverlay} onClick={onClose}>
+      <form
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="cancel-workout-title"
+        onSubmit={onSubmit}
+        onClick={(event) => event.stopPropagation()}
+        style={modalCard}
+      >
+        <div style={modalIcon}>!</div>
+        <div>
+          <h2 id="cancel-workout-title" style={modalTitle}>
+            Отменить тренировку?
+          </h2>
+          <p style={modalText}>
+            {workout.title
+              ? `Тренировка «${workout.title}» будет закрыта для заявок и участников.`
+              : 'Тренировка будет закрыта для заявок и участников.'}
+          </p>
+        </div>
+        <label style={modalField}>
+          <span style={modalLabel}>Причина отмены</span>
+          <textarea
+            value={reason}
+            onChange={(event) => onReasonChange(event.target.value)}
+            rows={4}
+            required
+            autoFocus
+            placeholder="Например: перенос из-за погоды"
+            style={modalTextarea}
+          />
+        </label>
+        <div style={modalActions}>
+          <Btn onClick={onClose} disabled={saving}>
+            Оставить тренировку
+          </Btn>
+          <Btn danger type="submit" disabled={saving || !reason.trim()}>
+            {saving ? 'Отменяем...' : 'Отменить тренировку'}
+          </Btn>
+        </div>
+      </form>
     </div>
   )
 }
@@ -725,6 +852,87 @@ const infoGrid = {
   display: 'grid',
   gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
   gap: 14,
+}
+
+const modalOverlay = {
+  position: 'fixed',
+  inset: 0,
+  zIndex: 60,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: 18,
+  background: 'rgba(26, 25, 21, 0.48)',
+}
+
+const modalCard = {
+  width: 'min(520px, 100%)',
+  display: 'grid',
+  gridTemplateColumns: '44px 1fr',
+  gap: '14px 16px',
+  background: T.surface,
+  border: `1px solid ${T.border}`,
+  borderRadius: T.radiusLg,
+  padding: 22,
+  boxShadow: '0 24px 70px rgba(26, 25, 21, 0.24)',
+}
+
+const modalIcon = {
+  width: 44,
+  height: 44,
+  borderRadius: '50%',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  background: T.dangerLight,
+  color: T.danger,
+  fontWeight: 900,
+}
+
+const modalTitle = {
+  margin: '0 0 6px',
+  color: T.text,
+  fontSize: 20,
+  lineHeight: 1.2,
+}
+
+const modalText = {
+  margin: 0,
+  color: T.textMuted,
+  fontSize: 13,
+  lineHeight: 1.5,
+}
+
+const modalField = {
+  gridColumn: '1 / -1',
+  display: 'grid',
+  gap: 6,
+}
+
+const modalLabel = {
+  color: T.textMuted,
+  fontSize: 12,
+  fontWeight: 800,
+}
+
+const modalTextarea = {
+  width: '100%',
+  minHeight: 110,
+  resize: 'vertical',
+  border: `1px solid ${T.border}`,
+  borderRadius: T.radiusSm,
+  padding: '10px 12px',
+  color: T.text,
+  font: 'inherit',
+  outline: 'none',
+}
+
+const modalActions = {
+  gridColumn: '1 / -1',
+  display: 'flex',
+  justifyContent: 'flex-end',
+  gap: 8,
+  flexWrap: 'wrap',
 }
 
 const headerGrid = {

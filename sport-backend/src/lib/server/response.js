@@ -5,11 +5,21 @@ import { logger } from './logger'
 const REQUEST_ID_HEADER = 'x-request-id'
 
 export function json(payload, status = 200) {
-  return NextResponse.json(payload, { status })
+  return NextResponse.json(payload, {
+    status,
+    headers: {
+      'Cache-Control': 'no-store',
+    },
+  })
 }
 
 export function noContent() {
-  return new NextResponse(null, { status: 204 })
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      'Cache-Control': 'no-store',
+    },
+  })
 }
 
 function redactSearchParams(searchParams) {
@@ -91,7 +101,12 @@ export function errorResponse(error, request, requestId) {
     )
   }
 
-  return NextResponse.json(payload, { status })
+  return NextResponse.json(payload, {
+    status,
+    headers: {
+      'Cache-Control': 'no-store',
+    },
+  })
 }
 
 export function route(handler) {

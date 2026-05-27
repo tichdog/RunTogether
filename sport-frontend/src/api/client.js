@@ -1,25 +1,105 @@
 const API_BASE = import.meta.env.VITE_API_URL || ''
 
+const STALE_TIME = {
+  short: 15_000,
+  medium: 30_000,
+  long: 60_000,
+  settings: 5 * 60_000,
+}
+
+const responseCache = new Map()
+
 async function request(path, options = {}) {
-  const isFormData = options.body instanceof FormData
-  const response = await fetch(`${API_BASE}${path}`, {
+  const { staleTime = 0, ...fetchOptions } = options
+  const method = (fetchOptions.method || 'GET').toUpperCase()
+  const shouldCache = method === 'GET' && staleTime > 0 && !fetchOptions.signal
+  const cacheKey = path
+
+  if (shouldCache) {
+    const cached = responseCache.get(cacheKey)
+    if (cached?.expiresAt > Date.now() && 'data' in cached) {
+      return cloneCachedData(cached.data)
+    }
+    if (cached?.promise) {
+      return cached.promise.then(cloneCachedData)
+    }
+  }
+
+  const isFormData = fetchOptions.body instanceof FormData
+  const promise = fetch(`${API_BASE}${path}`, {
     credentials: 'include',
     headers: isFormData
-      ? { ...(options.headers || {}) }
+      ? { ...(fetchOptions.headers || {}) }
       : {
           'Content-Type': 'application/json',
-          ...(options.headers || {}),
+          ...(fetchOptions.headers || {}),
         },
-    ...options,
+    ...fetchOptions,
   })
+    .then(async (response) => {
+      if (response.status === 204) return null
 
-  if (response.status === 204) return null
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        throw new Error(data.error || 'Ошибка запроса')
+      }
+      return data
+    })
+    .then((data) => {
+      if (shouldCache) {
+        responseCache.set(cacheKey, {
+          data,
+          expiresAt: Date.now() + staleTime,
+        })
+      } else if (method !== 'GET') {
+        clearResponseCache()
+      }
 
-  const data = await response.json().catch(() => ({}))
-  if (!response.ok) {
-    throw new Error(data.error || 'Ошибка запроса')
+      return data
+    })
+    .catch((error) => {
+      if (shouldCache) responseCache.delete(cacheKey)
+      throw error
+    })
+
+  if (shouldCache) {
+    responseCache.set(cacheKey, {
+      promise,
+      expiresAt: Date.now() + staleTime,
+    })
   }
-  return data
+
+  return promise
+}
+
+function clearResponseCache() {
+  responseCache.clear()
+}
+
+function cloneCachedData(data) {
+  if (data == null) return data
+  if (typeof structuredClone === 'function') return structuredClone(data)
+  return JSON.parse(JSON.stringify(data))
+}
+
+function toQuery(params = {}) {
+  const search = new URLSearchParams()
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') {
+      search.set(key, value)
+    }
+  })
+  const text = search.toString()
+  return text ? `?${text}` : ''
+}
+
+function uploadAvatar(path, file) {
+  const form = new FormData()
+  form.append('avatar', file)
+  return request(path, {
+    method: 'POST',
+    body: form,
+  })
 }
 
 export const api = {
@@ -38,8 +118,8 @@ export const api = {
   logout: () => request('/api/auth/logout', { method: 'POST' }),
   me: () => request('/api/auth/me'),
 
-  users: (params) => request(`/api/users${toQuery(params)}`),
-  user: (id) => request(`/api/users/${id}`),
+  users: (params) => request(`/api/users${toQuery(params)}`, { staleTime: STALE_TIME.medium }),
+  user: (id) => request(`/api/users/${id}`, { staleTime: STALE_TIME.short }),
   updateMe: (payload) =>
     request('/api/users/me', {
       method: 'PATCH',
@@ -57,12 +137,17 @@ export const api = {
       method: 'PATCH',
       body: JSON.stringify(payload),
     }),
+  unblockUser: (id) =>
+    request(`/api/users/${id}/block`, {
+      method: 'PATCH',
+      body: JSON.stringify({ action: 'unblock' }),
+    }),
   deleteUser: (id) => request(`/api/users/${id}`, { method: 'DELETE' }),
-  history: (id) => request(`/api/users/${id}/history`),
-  achievements: (id) => request(`/api/users/${id}/achievements`),
+  history: (id) => request(`/api/users/${id}/history`, { staleTime: STALE_TIME.medium }),
+  achievements: (id) => request(`/api/users/${id}/achievements`, { staleTime: STALE_TIME.medium }),
 
-  workouts: (params) => request(`/api/workouts${toQuery(params)}`),
-  workout: (id) => request(`/api/workouts/${id}`),
+  workouts: (params) => request(`/api/workouts${toQuery(params)}`, { staleTime: STALE_TIME.short }),
+  workout: (id) => request(`/api/workouts/${id}`, { staleTime: STALE_TIME.short }),
   createWorkout: (payload) =>
     request('/api/workouts', {
       method: 'POST',
@@ -99,7 +184,8 @@ export const api = {
 
   notifications: () => request('/api/notifications'),
   readNotification: (id) => request(`/api/notifications/${id}/read`, { method: 'PATCH' }),
-  reports: (params) => request(`/api/reports${toQuery(params)}`),
+  readAllNotifications: () => request('/api/notifications', { method: 'PATCH' }),
+  reports: (params) => request(`/api/reports${toQuery(params)}`, { staleTime: STALE_TIME.short }),
   createReport: (payload) =>
     request('/api/reports', {
       method: 'POST',
@@ -110,14 +196,14 @@ export const api = {
       method: 'PATCH',
       body: JSON.stringify(payload),
     }),
-  activities: () => request('/api/activities'),
-  settings: () => request('/api/settings'),
+  activities: () => request('/api/activities', { staleTime: STALE_TIME.medium }),
+  settings: () => request('/api/settings', { staleTime: STALE_TIME.settings }),
   saveSettings: (payload) =>
     request('/api/settings', {
       method: 'PATCH',
       body: JSON.stringify(payload),
     }),
-  adminAchievements: () => request('/api/achievements'),
+  adminAchievements: () => request('/api/achievements', { staleTime: STALE_TIME.long }),
   createAchievement: (payload) =>
     request('/api/achievements', {
       method: 'POST',
@@ -129,24 +215,4 @@ export const api = {
       body: JSON.stringify(payload),
     }),
   deleteAchievement: (id) => request(`/api/achievements/${id}`, { method: 'DELETE' }),
-}
-
-function toQuery(params = {}) {
-  const search = new URLSearchParams()
-  Object.entries(params || {}).forEach(([key, value]) => {
-    if (value !== undefined && value !== null && value !== '') {
-      search.set(key, value)
-    }
-  })
-  const text = search.toString()
-  return text ? `?${text}` : ''
-}
-
-function uploadAvatar(path, file) {
-  const form = new FormData()
-  form.append('avatar', file)
-  return request(path, {
-    method: 'POST',
-    body: form,
-  })
 }

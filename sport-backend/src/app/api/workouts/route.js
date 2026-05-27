@@ -15,6 +15,12 @@ export const GET = route(async (request) => {
   const radiusKm =
     hasGeo && searchParams.get('radiusKm') != null ? Number(searchParams.get('radiusKm')) : null
   const sort = searchParams.get('sort') === 'distance' && hasGeo ? 'distance' : 'time'
+  const archiveOnly =
+    searchParams.get('archiveOnly') === 'true' || searchParams.get('archive') === 'only'
+  const includeArchived =
+    archiveOnly ||
+    searchParams.get('archive') === '1' ||
+    searchParams.get('includeArchived') === 'true'
 
   const distanceExpr = hasGeo
     ? `(6371 * acos(least(1, greatest(-1,
@@ -80,14 +86,23 @@ export const GET = route(async (request) => {
         and ($5::numeric is null or w.pace_min_per_km <= $5)
         and ($6::text is null or w.difficulty = $6)
         and ($7::numeric is null or ${distanceExpr} <= $7)
+        and (
+          not ($${currentUserParam + 1}::boolean)
+          or w.status = 'archived'
+          or (
+            w.status <> 'cancelled'
+            and now() >= w.start_at + ((w.duration_minutes + 1440) || ' minutes')::interval
+          )
+        )
+        and ($${currentUserParam + 2}::boolean or $${currentUserParam + 1}::boolean or w.status <> 'archived')
       group by w.id, u.id, os.average_rating, my_wp.status, my_wp.id
       order by ${
         sort === 'distance'
-          ? 'distance_from_user_km nulls last, w.start_at'
-          : "case when w.status in ('completed', 'cancelled') or now() >= w.start_at + (w.duration_minutes || ' minutes')::interval then 1 else 0 end, w.start_at"
+          ? 'distance_from_user_km nulls last, w.created_at desc, w.start_at desc'
+          : 'w.created_at desc, w.start_at desc'
       }
       limit 100`,
-    params
+    [...params, archiveOnly, includeArchived]
   )
 
   const syncedRows = await Promise.all(
@@ -96,7 +111,14 @@ export const GET = route(async (request) => {
       return synced ? { ...row, status: synced.status, updated_at: synced.updated_at } : row
     })
   )
-  return json({ workouts: syncedRows.map(workoutPayload) })
+  return json({
+    workouts: syncedRows
+      .filter((row) => {
+        if (archiveOnly) return row.status === 'archived'
+        return includeArchived || row.status !== 'archived'
+      })
+      .map(workoutPayload),
+  })
 })
 
 export const POST = route(async (request) => {

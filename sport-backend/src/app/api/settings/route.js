@@ -10,5 +10,9 @@ export const GET = route(async (request) => {
 export const PATCH = route(async (request) => {
   const user = await requireAuth(request)
   requireAdmin(user)
-  return json({ settings: await upsertSettings(await readJson(request)) })
+  const values = await readJson(request)
+  if (user.role !== 'super_admin') {
+    delete values.workout_archive_retention_days
+  }
+  return json({ settings: await upsertSettings(values) })
 })

@@ -65,6 +65,17 @@ export function UserDetail({ user, currentAdmin, onBack, onChanged, onDeleted })
     }
   }
 
+  const unblock = async () => {
+    setError('')
+    try {
+      const data = await api.unblockUser(current.id)
+      setCurrent(data.user)
+      onChanged?.(data.user)
+    } catch (err) {
+      setError(err.message)
+    }
+  }
+
   const remove = async () => {
     setError('')
     try {
@@ -79,9 +90,10 @@ export function UserDetail({ user, currentAdmin, onBack, onChanged, onDeleted })
   const targetIsAdmin = ['admin', 'super_admin'].includes(current.role)
   const canManageTargetAdmin = currentAdmin?.role === 'super_admin'
   const canDelete = !isSelf && (!targetIsAdmin || canManageTargetAdmin)
-  const canBlock = canDelete
+  const canModerateStatus = canDelete
   const canChangeRole = !isSelf && (!targetIsAdmin || canManageTargetAdmin)
   const canChangeAvatar = isSelf || !targetIsAdmin || canManageTargetAdmin
+  const isBlocked = current.status === 'blocked'
 
   const statCards = [
     ['Проведено', current.stats?.organizedWorkouts || 0, T.accent],
@@ -331,9 +343,20 @@ export function UserDetail({ user, currentAdmin, onBack, onChanged, onDeleted })
           <Card>
             <SectionTitle>Модерация</SectionTitle>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <Btn danger onClick={block} disabled={!canBlock} style={{ width: '100%' }}>
-                Заблокировать
-              </Btn>
+              {isBlocked ? (
+                <Btn
+                  variant="primary"
+                  onClick={unblock}
+                  disabled={!canModerateStatus}
+                  style={{ width: '100%' }}
+                >
+                  Разблокировать
+                </Btn>
+              ) : (
+                <Btn danger onClick={block} disabled={!canModerateStatus} style={{ width: '100%' }}>
+                  Заблокировать
+                </Btn>
+              )}
               <Btn danger onClick={remove} disabled={!canDelete} style={{ width: '100%' }}>
                 Удалить пользователя
               </Btn>

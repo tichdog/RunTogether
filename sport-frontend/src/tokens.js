@@ -47,6 +47,7 @@ export const STATUS_LABELS = {
   full: 'Набор завершен',
   in_progress: 'В процессе',
   completed: 'Завершена',
+  archived: 'Завершена',
   cancelled: 'Отменена',
 }
 
@@ -58,5 +59,6 @@ export const STATUS_STYLES = {
   full: { bg: '#FFF7ED', text: '#C2410C', dot: '#EA580C', border: '#FED7AA' },
   in_progress: { bg: '#F0FDF4', text: '#15803D', dot: '#16A34A', border: '#BBF7D0' },
   completed: { bg: '#EEF2FF', text: '#395FC0', dot: '#4D7CFE', border: '#C7D2FE' },
+  archived: { bg: '#EEF2FF', text: '#395FC0', dot: '#4D7CFE', border: '#C7D2FE' },
   cancelled: { bg: '#FEF2F2', text: '#DC2626', dot: '#DC2626', border: '#FECACA' },
 }

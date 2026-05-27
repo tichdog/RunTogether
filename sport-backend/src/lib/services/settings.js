@@ -6,17 +6,36 @@ const DEFAULTS = {
   require_phone_verification: false,
   default_participant_limit: 20,
   auto_block_complaints_count: 10,
+  workout_archive_retention_days: 90,
+}
+
+const SETTINGS_CACHE_TTL_MS = 60_000
+let settingsCache = null
+
+export function clearSettingsCache() {
+  settingsCache = null
 }
 
 export async function getSettings() {
+  if (settingsCache && settingsCache.expiresAt > Date.now()) {
+    return { ...settingsCache.value }
+  }
+
   const { rows } = await query('select key, value from system_settings')
-  return rows.reduce(
+  const value = rows.reduce(
     (acc, row) => {
       acc[row.key] = row.value
       return acc
     },
     { ...DEFAULTS }
   )
+
+  settingsCache = {
+    value,
+    expiresAt: Date.now() + SETTINGS_CACHE_TTL_MS,
+  }
+
+  return { ...value }
 }
 
 export async function upsertSettings(values) {
@@ -31,5 +50,6 @@ export async function upsertSettings(values) {
       )
     }
   }
+  clearSettingsCache()
   return getSettings()
 }

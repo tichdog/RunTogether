@@ -500,7 +500,8 @@
   border-color: #ffc4c4;
 }
 
-.rt-status.completed {
+.rt-status.completed,
+.rt-status.archived {
   background: #e5ecff;
   color: #395fc0;
   border-color: #c8d6ff;
@@ -514,13 +515,14 @@
 
 .rt-toolbar {
   display: grid;
-  grid-template-columns: minmax(260px, 1fr) 190px 170px;
+  grid-template-columns: minmax(260px, 1fr) 190px 170px auto;
   gap: 10px;
   margin-bottom: 22px;
 }
 
 .rt-search,
 .rt-toolbar select,
+.rt-view-toggle,
 .rt-form input,
 .rt-form select,
 .rt-form textarea {
@@ -553,6 +555,30 @@
 .rt-form select,
 .rt-form textarea {
   padding: 10px 12px;
+}
+
+.rt-view-toggle {
+  display: inline-grid;
+  grid-template-columns: repeat(2, minmax(86px, 1fr));
+  align-items: center;
+  padding: 3px;
+}
+
+.rt-view-toggle button {
+  min-height: 38px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--rt-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.rt-view-toggle button.active {
+  background: var(--rt-text);
+  color: #fff;
 }
 
 .rt-form textarea {
@@ -1007,6 +1033,23 @@
   gap: 10px;
 }
 
+.rt-notification-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.rt-notification-head .rt-section-head {
+  margin-bottom: 0;
+}
+
+.rt-notification-head .rt-secondary {
+  min-height: 40px;
+  flex: 0 0 auto;
+}
+
 .rt-notification {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -1055,6 +1098,86 @@
   font-size: 12px;
   font-weight: 800;
   padding: 8px 10px;
+}
+
+.rt-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  background: rgba(32, 33, 29, 0.48);
+}
+
+.rt-cancel-dialog {
+  width: min(520px, 100%);
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr);
+  gap: 14px 16px;
+  padding: 22px;
+  border: 1px solid var(--rt-border);
+  border-radius: 8px;
+  background: var(--rt-surface);
+  box-shadow: 0 24px 70px rgba(32, 33, 29, 0.24);
+}
+
+.rt-cancel-dialog-icon {
+  width: 46px;
+  height: 46px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #fff0f0;
+  color: var(--rt-danger);
+  font-weight: 900;
+}
+
+.rt-cancel-dialog h2 {
+  margin: 0 0 6px;
+  font-size: 21px;
+  line-height: 1.2;
+}
+
+.rt-cancel-dialog p {
+  margin: 0;
+  color: var(--rt-muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.rt-cancel-dialog label {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 7px;
+}
+
+.rt-cancel-dialog label span {
+  color: var(--rt-muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.rt-cancel-dialog textarea {
+  width: 100%;
+  min-height: 112px;
+  padding: 11px 12px;
+  border: 1px solid var(--rt-border);
+  border-radius: 8px;
+  color: var(--rt-text);
+  font: inherit;
+  resize: vertical;
+}
+
+.rt-cancel-dialog-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .rt-avatar-upload {
@@ -1284,6 +1407,7 @@
 
   .rt-card-footer,
   .rt-page-head,
+  .rt-notification-head,
   .rt-section-head {
     align-items: flex-start;
     flex-direction: column;
@@ -1304,6 +1428,14 @@
 
   .rt-request-actions {
     width: 100%;
+  }
+
+  .rt-notification-head .rt-secondary {
+    width: 100%;
+  }
+
+  .rt-cancel-dialog {
+    grid-template-columns: 1fr;
   }
 
   .rt-request-actions button {

@@ -29,7 +29,7 @@ function passwordRules(password) {
 export function Auth({ onAuth }) {
   const [mode, setMode] = useState('login')
   const [form, setForm] = useState({
-    login: 'admin@sport.local',
+    login: '',
     email: '',
     firstName: '',
     lastName: '',
