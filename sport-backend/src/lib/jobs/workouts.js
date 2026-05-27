@@ -74,3 +74,15 @@ export async function deleteExpiredArchivedWorkouts() {
   })
   return result.count
 }
+
+export async function deleteExpiredNotifications() {
+  const settings = await getSettings()
+  const retentionDays = Math.max(1, Number(settings.notification_retention_days) || 30)
+  const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000)
+  const result = await prisma.notifications.deleteMany({
+    where: {
+      created_at: { lt: cutoff },
+    },
+  })
+  return result.count
+}

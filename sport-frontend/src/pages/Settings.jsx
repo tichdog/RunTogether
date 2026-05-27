@@ -134,6 +134,16 @@ export function Settings({ currentUser }) {
             />
           </label>
           <label style={numberRow}>
+            <span>Хранить уведомления, дней</span>
+            <Input
+              type="number"
+              value={settings.notification_retention_days}
+              min={1}
+              onChange={(e) => set('notification_retention_days')(Number(e.target.value))}
+              style={{ width: 90 }}
+            />
+          </label>
+          <label style={numberRow}>
             <span>
               Хранить архив тренировок, дней
               {!isSuperAdmin && (

@@ -1104,6 +1104,67 @@
   gap: 10px;
 }
 
+.rt-notification-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.rt-notification-filters button {
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  border: 1px solid var(--rt-border);
+  border-radius: 8px;
+  background: var(--rt-surface);
+  color: var(--rt-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.rt-notification-filters button.active {
+  border-color: var(--rt-text);
+  background: var(--rt-text);
+  color: #fff;
+}
+
+.rt-notification-filters em {
+  min-width: 22px;
+  min-height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: var(--rt-surface-soft);
+  color: var(--rt-muted);
+  font-size: 11px;
+  font-style: normal;
+}
+
+.rt-notification-filters button.active em {
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+}
+
+.rt-notification-groups {
+  display: grid;
+  gap: 18px;
+}
+
+.rt-notification-group h2 {
+  margin: 0 0 8px;
+  color: var(--rt-muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
 .rt-notification-head {
   display: flex;
   align-items: flex-start;
@@ -1145,6 +1206,38 @@
 .rt-notification p,
 .rt-notification span {
   display: block;
+}
+
+.rt-notification-kind {
+  width: fit-content;
+  margin: 0 0 8px !important;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: var(--rt-soft);
+  color: var(--rt-accent-strong) !important;
+  font-size: 11px !important;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.rt-notification-kind.reviews {
+  background: #e5ecff;
+  color: #395fc0 !important;
+}
+
+.rt-notification-kind.requests {
+  background: #fff4ce;
+  color: var(--rt-warning) !important;
+}
+
+.rt-notification-kind.workouts {
+  background: #e5f7dc;
+  color: #246a35 !important;
+}
+
+.rt-notification-kind.moderation {
+  background: #fff0f0;
+  color: var(--rt-danger) !important;
 }
 
 .rt-notification p {

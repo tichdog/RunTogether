@@ -135,6 +135,20 @@ The dashboard includes panels for all API requests, 4xx responses, 5xx responses
 - Uploaded files are stored in `UPLOAD_DIR` and served from `/uploads/:file`.
 - Workout status sync and reminder creation are available at `POST /api/cron/workouts`.
   Set `CRON_SECRET` and call the endpoint with `Authorization: Bearer <CRON_SECRET>` in production.
+- The same cleanup jobs can run without HTTP as a separate process:
+
+```bash
+npm run cron:run
+```
+
+Run continuously with:
+
+```bash
+npm run cron:loop
+```
+
+`cron:loop` runs immediately and then every `CRON_INTERVAL_MS` milliseconds. The default is 1 hour.
+It calls `CRON_URL` with `CRON_SECRET`, so keep the backend server running alongside it.
 
 ## Production Safety
 

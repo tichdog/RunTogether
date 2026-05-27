@@ -4,6 +4,7 @@ import { json, route } from '@/lib/server/response'
 import {
   createReminderNotifications,
   deleteExpiredArchivedWorkouts,
+  deleteExpiredNotifications,
   syncActiveWorkoutStatuses,
 } from '@/lib/jobs/workouts'
 
@@ -19,10 +20,11 @@ function assertCronAccess(request) {
 export const POST = route(async (request) => {
   assertCronAccess(request)
   const syncedWorkouts = await syncActiveWorkoutStatuses()
-  const [remindersCreated, archivedDeleted] = await Promise.all([
+  const [remindersCreated, archivedDeleted, notificationsDeleted] = await Promise.all([
     createReminderNotifications(),
     deleteExpiredArchivedWorkouts(),
+    deleteExpiredNotifications(),
   ])
 
-  return json({ ok: true, syncedWorkouts, remindersCreated, archivedDeleted })
+  return json({ ok: true, syncedWorkouts, remindersCreated, archivedDeleted, notificationsDeleted })
 })

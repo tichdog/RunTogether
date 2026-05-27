@@ -8,6 +8,7 @@ const DEFAULTS = {
   auto_block_complaints_count: 10,
   workout_archive_retention_days: 90,
   review_window_days: 7,
+  notification_retention_days: 30,
 }
 
 const SETTINGS_CACHE_TTL_MS = 60_000

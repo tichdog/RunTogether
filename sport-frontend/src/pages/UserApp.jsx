@@ -1881,12 +1881,22 @@ function ModerationNoticeList({ user, notifications = [] }) {
 }
 
 function NotificationsScreen({ notifications, readingAll, onRead, onReadAll }) {
+  const [filter, setFilter] = useState('all')
   const unreadCount = notifications.filter((item) => !item.read_at).length
+  const filters = notificationFilters(notifications)
+  const visibleNotifications =
+    filter === 'all'
+      ? notifications
+      : notifications.filter((notification) => notificationGroupId(notification.type) === filter)
+  const groupedNotifications = groupNotificationsByDay(visibleNotifications)
 
   return (
     <section className="rt-page">
       <div className="rt-notification-head">
-        <SectionHead title="Уведомления" caption={`${unreadCount} новых`} />
+        <SectionHead
+          title="Уведомления"
+          caption={`${unreadCount} новых · ${notifications.length} всего`}
+        />
         <button
           className="rt-secondary"
           type="button"
@@ -1896,20 +1906,48 @@ function NotificationsScreen({ notifications, readingAll, onRead, onReadAll }) {
           {readingAll ? 'Обновляем...' : 'Прочитать все'}
         </button>
       </div>
-      <div className="rt-notification-list">
-        {notifications.map((notification) => (
-          <NotificationItem
-            key={notification.id}
-            notification={notification}
-            onRead={() => onRead(notification.id)}
-          />
+
+      {!!notifications.length && (
+        <div className="rt-notification-filters" aria-label="Фильтр уведомлений">
+          {filters.map((item) => (
+            <button
+              key={item.id}
+              className={filter === item.id ? 'active' : ''}
+              type="button"
+              onClick={() => setFilter(item.id)}
+            >
+              <span>{item.label}</span>
+              <em>{item.count}</em>
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div className="rt-notification-groups">
+        {groupedNotifications.map((group) => (
+          <section className="rt-notification-group" key={group.key}>
+            <h2>{group.label}</h2>
+            <div className="rt-notification-list">
+              {group.items.map((notification) => (
+                <NotificationItem
+                  key={notification.id}
+                  notification={notification}
+                  onRead={() => onRead(notification.id)}
+                />
+              ))}
+            </div>
+          </section>
         ))}
       </div>
+
       {!notifications.length && (
         <EmptyState
           title="Уведомлений пока нет"
           text="Предупреждения и решения администрации появятся здесь."
         />
+      )}
+      {!!notifications.length && !visibleNotifications.length && (
+        <EmptyState title="В этой группе пусто" text="Попробуйте другой фильтр уведомлений." />
       )}
     </section>
   )
@@ -1917,11 +1955,15 @@ function NotificationsScreen({ notifications, readingAll, onRead, onReadAll }) {
 
 function NotificationItem({ notification, compact = false, onRead }) {
   const isModeration = ['moderation_warning', 'moderation_ban'].includes(notification.type)
+  const meta = notificationTypeMeta(notification.type)
   return (
     <article
       className={`rt-notification ${notification.read_at ? '' : 'unread'} ${isModeration ? 'moderation' : ''}`}
     >
       <div>
+        {!compact && (
+          <span className={`rt-notification-kind ${meta.group}`}>{meta.label}</span>
+        )}
         <strong>{notification.title}</strong>
         <p>{notification.message}</p>
         {!compact && <span>{new Date(notification.created_at).toLocaleString()}</span>}
@@ -1933,6 +1975,80 @@ function NotificationItem({ notification, compact = false, onRead }) {
       )}
     </article>
   )
+}
+
+function notificationTypeMeta(type) {
+  const meta = {
+    participation_request: { group: 'requests', label: 'Заявка' },
+    participation_response: { group: 'requests', label: 'Заявка' },
+    participation_removed: { group: 'requests', label: 'Участие' },
+    workout_review: { group: 'reviews', label: 'Отзыв' },
+    workout_created: { group: 'workouts', label: 'Тренировка' },
+    workout_changed: { group: 'workouts', label: 'Изменение' },
+    workout_cancelled: { group: 'workouts', label: 'Отмена' },
+    workout_reminder: { group: 'workouts', label: 'Напоминание' },
+    moderation_warning: { group: 'moderation', label: 'Модерация' },
+    moderation_ban: { group: 'moderation', label: 'Модерация' },
+    achievement: { group: 'system', label: 'Достижение' },
+  }
+
+  return meta[type] || { group: 'system', label: 'Система' }
+}
+
+function notificationGroupId(type) {
+  return notificationTypeMeta(type).group
+}
+
+function notificationFilters(notifications) {
+  const labels = {
+    all: 'Все',
+    requests: 'Заявки',
+    reviews: 'Отзывы',
+    workouts: 'Тренировки',
+    moderation: 'Модерация',
+    system: 'Система',
+  }
+  const counts = notifications.reduce(
+    (acc, notification) => {
+      const group = notificationGroupId(notification.type)
+      acc.all += 1
+      acc[group] = (acc[group] || 0) + 1
+      return acc
+    },
+    { all: 0 }
+  )
+
+  return ['all', 'requests', 'reviews', 'workouts', 'moderation', 'system']
+    .filter((id) => id === 'all' || counts[id])
+    .map((id) => ({ id, label: labels[id], count: counts[id] || 0 }))
+}
+
+function groupNotificationsByDay(notifications) {
+  const today = new Date()
+  const yesterday = new Date(today)
+  yesterday.setDate(today.getDate() - 1)
+  const groups = new Map()
+
+  for (const notification of notifications) {
+    const date = new Date(notification.created_at)
+    const key = date.toDateString()
+    if (!groups.has(key)) {
+      groups.set(key, {
+        key,
+        label: notificationDayLabel(date, today, yesterday),
+        items: [],
+      })
+    }
+    groups.get(key).items.push(notification)
+  }
+
+  return [...groups.values()]
+}
+
+function notificationDayLabel(date, today, yesterday) {
+  if (date.toDateString() === today.toDateString()) return 'Сегодня'
+  if (date.toDateString() === yesterday.toDateString()) return 'Вчера'
+  return date.toLocaleDateString()
 }
 
 function WorkoutList({ workouts, userId, onOpen, saving, onJoin, onLeave, empty }) {

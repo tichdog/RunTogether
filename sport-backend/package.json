@@ -13,6 +13,8 @@
     "observability:down": "docker compose stop loki promtail grafana",
     "build": "next build",
     "start": "next start -p 4000",
+    "cron:run": "node src/scripts/cron-runner.js",
+    "cron:loop": "node src/scripts/cron-runner.js --loop",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier \"src/**/*.js\" \"middleware.js\" \"next.config.mjs\" \"eslint.config.js\" \"jsconfig.json\" \"package.json\" \"docker-compose.yml\" \"README.md\" --write --config ../.prettierrc --ignore-path ../.prettierignore",

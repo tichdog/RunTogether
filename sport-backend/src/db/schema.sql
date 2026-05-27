@@ -206,7 +206,8 @@ insert into system_settings (key, value) values
   ('default_participant_limit', '20'),
   ('auto_block_complaints_count', '10'),
   ('workout_archive_retention_days', '90'),
-  ('review_window_days', '7')
+  ('review_window_days', '7'),
+  ('notification_retention_days', '30')
 on conflict (key) do nothing;
 
 insert into achievements (code, title, description, icon, condition) values
