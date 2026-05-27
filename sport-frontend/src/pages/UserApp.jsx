@@ -2374,10 +2374,13 @@ function Icon({ name }) {
     ),
     runner: (
       <>
-        <circle cx="13" cy="4" r="2" />
-        <path d="M9 21l3-7-4-2-2 4" />
-        <path d="M14 8l-2 6 5 2" />
-        <path d="M10 8l4 2 3-2" />
+        <path d="M6.5 6.5l11 11" />
+        <path d="M21 14l-7 7" />
+        <path d="M3 10l7-7" />
+        <path d="M17 6l1 1" />
+        <path d="M6 17l1 1" />
+        <path d="M19 4l1 1" />
+        <path d="M4 19l1 1" />
       </>
     ),
     clipboard: (

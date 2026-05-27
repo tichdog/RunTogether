@@ -4,6 +4,7 @@ import { badRequest, HttpError } from '@/lib/server/http-error'
 import { json, readJson, route } from '@/lib/server/response'
 import { publicUser } from '@/lib/mappers/user'
 import { createAuthSession, setAuthCookies } from '@/lib/server/auth'
+import { assertRateLimit } from '@/lib/server/rate-limit'
 
 function normalizeEmail(email) {
   return email ? String(email).trim().toLowerCase() : null
@@ -20,6 +21,12 @@ const EMAIL_RE = /^[A-Za-z0-9._%+-]{2,64}@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/
 const STRONG_PASSWORD_RE = /^(?=.*[a-zа-яё])(?=.*[A-ZА-ЯЁ])(?=.*\d)(?=.*[^A-Za-zА-Яа-яЁё0-9]).{8,}$/
 
 export const POST = route(async (request) => {
+  assertRateLimit(request, {
+    keyPrefix: 'auth:register',
+    limit: 3,
+    windowMs: 5 * 60 * 1000,
+  })
+
   const body = await readJson(request)
   const email = normalizeEmail(body.email)
   const phone = normalizePhone(body.phone)
