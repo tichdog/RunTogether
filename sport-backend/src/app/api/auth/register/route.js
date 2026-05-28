@@ -5,6 +5,7 @@ import { json, readJson, route } from '@/lib/server/response'
 import { publicUser } from '@/lib/mappers/user'
 import { createAuthSession, setAuthCookies } from '@/lib/server/auth'
 import { assertRateLimit } from '@/lib/server/rate-limit'
+import { assertTurnstile } from '@/lib/server/turnstile'
 
 function normalizeEmail(email) {
   return email ? String(email).trim().toLowerCase() : null
@@ -55,6 +56,8 @@ export const POST = route(async (request) => {
       'Пароль должен быть от 8 символов и содержать прописные, строчные буквы, цифры и символы'
     )
   }
+
+  await assertTurnstile(request, body.turnstileToken)
 
   const existing = await prisma.users.findFirst({
     where: {

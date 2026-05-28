@@ -1,10 +1,127 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../api/client'
 import '../styles/auth.css'
 
+const DEFAULT_TURNSTILE_SITE_KEY = '1x00000000000000000000AA'
+const DUMMY_TURNSTILE_TOKEN = 'XXXX.DUMMY.TOKEN.XXXX'
+const TURNSTILE_SCRIPT_URL = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit'
+const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY || DEFAULT_TURNSTILE_SITE_KEY
+const TURNSTILE_LOAD_TIMEOUT_MS = 10000
 const NAME_RE = /^\p{L}{2,15}$/u
 const LAST_NAME_RE = /^\p{L}{2,15}(?:-\p{L}{2,15})?$/u
 const EMAIL_RE = /^[A-Za-z0-9._%+-]{2,64}@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/
+
+let turnstileScriptPromise = null
+
+function loadTurnstileScript() {
+  if (window.turnstile) return Promise.resolve()
+
+  if (!turnstileScriptPromise) {
+    turnstileScriptPromise = new Promise((resolve, reject) => {
+      const timeoutId = window.setTimeout(() => {
+        reject(new Error('Turnstile script load timed out'))
+      }, TURNSTILE_LOAD_TIMEOUT_MS)
+      const finish = (callback) => {
+        window.clearTimeout(timeoutId)
+        callback()
+      }
+      const existingScript = document.querySelector(`script[src="${TURNSTILE_SCRIPT_URL}"]`)
+      if (existingScript) {
+        existingScript.addEventListener('load', () => finish(resolve), { once: true })
+        existingScript.addEventListener('error', () => finish(reject), { once: true })
+        return
+      }
+
+      const script = document.createElement('script')
+      script.src = TURNSTILE_SCRIPT_URL
+      script.async = true
+      script.defer = true
+      script.onload = () => finish(resolve)
+      script.onerror = () => finish(() => reject(new Error('Turnstile script failed to load')))
+      document.head.appendChild(script)
+    })
+  }
+
+  return turnstileScriptPromise.catch((error) => {
+    turnstileScriptPromise = null
+    throw error
+  })
+}
+
+function TurnstileWidget({ siteKey, onVerify, onReset, resetKey }) {
+  const containerRef = useRef(null)
+  const widgetIdRef = useRef(null)
+  const [status, setStatus] = useState('loading')
+
+  useEffect(() => {
+    let cancelled = false
+    const isDummySiteKey = siteKey === DEFAULT_TURNSTILE_SITE_KEY
+    onReset()
+    setStatus('loading')
+    if (isDummySiteKey) {
+      setStatus('verified')
+      onVerify(DUMMY_TURNSTILE_TOKEN)
+    }
+    const loadingTimeoutId = isDummySiteKey
+      ? null
+      : window.setTimeout(() => {
+          if (!cancelled) {
+            setStatus('error')
+            onReset()
+          }
+        }, TURNSTILE_LOAD_TIMEOUT_MS)
+
+    loadTurnstileScript()
+      .then(() => {
+        if (cancelled || !containerRef.current || !window.turnstile) return
+
+        if (loadingTimeoutId) window.clearTimeout(loadingTimeoutId)
+        setStatus('ready')
+        widgetIdRef.current = window.turnstile.render(containerRef.current, {
+          sitekey: siteKey,
+          action: 'register',
+          callback: (token) => {
+            setStatus('verified')
+            onVerify(token)
+          },
+          'expired-callback': () => {
+            setStatus('expired')
+            onReset()
+          },
+          'error-callback': () => {
+            setStatus('error')
+            onReset()
+          },
+        })
+      })
+      .catch(() => {
+        if (loadingTimeoutId) window.clearTimeout(loadingTimeoutId)
+        if (!cancelled) setStatus('error')
+      })
+
+    return () => {
+      cancelled = true
+      if (loadingTimeoutId) window.clearTimeout(loadingTimeoutId)
+      if (window.turnstile && widgetIdRef.current != null) {
+        window.turnstile.remove(widgetIdRef.current)
+      }
+      widgetIdRef.current = null
+    }
+  }, [siteKey, onVerify, onReset, resetKey])
+
+  return (
+    <div className="turnstile-field">
+      <div ref={containerRef} className="turnstile-widget" />
+      {status === 'loading' && <small className="field-hint pending">Загрузка проверки...</small>}
+      {status === 'expired' && (
+        <small className="field-hint error">Проверка истекла. Повторите ее.</small>
+      )}
+      {status === 'error' && (
+        <small className="field-hint error">Не удалось загрузить проверку Turnstile.</small>
+      )}
+    </div>
+  )
+}
 
 function EyeIcon({ visible }) {
   return (
@@ -43,6 +160,16 @@ export function Auth({ onAuth }) {
   const [emailCheck, setEmailCheck] = useState({ status: 'idle', email: '' })
   const [showPassword, setShowPassword] = useState(false)
   const [showPasswordConfirm, setShowPasswordConfirm] = useState(false)
+  const [turnstileToken, setTurnstileToken] = useState('')
+  const [turnstileResetKey, setTurnstileResetKey] = useState(0)
+
+  const handleTurnstileVerify = useCallback((token) => {
+    setTurnstileToken(token)
+  }, [])
+
+  const resetTurnstileToken = useCallback(() => {
+    setTurnstileToken('')
+  }, [])
 
   const rules = useMemo(() => passwordRules(form.password), [form.password])
   const passwordIsStrong = rules.every((rule) => rule.ok)
@@ -121,7 +248,8 @@ export function Auth({ onAuth }) {
     ['male', 'female'].includes(form.gender) &&
     passwordIsStrong &&
     passwordsMatch &&
-    form.acceptRules
+    form.acceptRules &&
+    Boolean(turnstileToken)
 
   const submit = async (event) => {
     event.preventDefault()
@@ -147,10 +275,15 @@ export function Auth({ onAuth }) {
               lastName: form.lastName.trim(),
               gender: form.gender,
               password: form.password,
+              turnstileToken,
             })
       onAuth(result.user)
     } catch (err) {
       setError(err.message)
+      if (mode === 'register') {
+        setTurnstileToken('')
+        setTurnstileResetKey((key) => key + 1)
+      }
     } finally {
       setLoading(false)
     }
@@ -175,6 +308,8 @@ export function Auth({ onAuth }) {
     }))
     setShowPassword(false)
     setShowPasswordConfirm(false)
+    setTurnstileToken('')
+    setTurnstileResetKey((key) => key + 1)
   }
 
   return (
@@ -332,6 +467,13 @@ export function Auth({ onAuth }) {
                 <input type="checkbox" checked={form.acceptRules} onChange={set('acceptRules')} />
                 <span>Принимаю правила сервиса и согласен на обработку данных</span>
               </label>
+
+              <TurnstileWidget
+                siteKey={TURNSTILE_SITE_KEY}
+                onVerify={handleTurnstileVerify}
+                onReset={resetTurnstileToken}
+                resetKey={turnstileResetKey}
+              />
             </>
           )}
 

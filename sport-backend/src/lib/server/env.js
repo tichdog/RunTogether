@@ -45,6 +45,13 @@ export const env = {
   cronSecret: requiredSecret('CRON_SECRET', '', {
     reject: ['', 'change-this-cron-secret'],
   }),
+  turnstileSecretKey: requiredSecret(
+    'TURNSTILE_SECRET_KEY',
+    '1x0000000000000000000000000000000AA',
+    {
+      minLength: 1,
+    }
+  ),
   logLevel: process.env.LOG_LEVEL || 'info',
   logFile: process.env.LOG_FILE || 'logs/backend.log',
   maxUploadBytes: numberFromEnv('MAX_UPLOAD_BYTES', 3 * 1024 * 1024),
