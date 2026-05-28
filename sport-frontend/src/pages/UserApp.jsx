@@ -136,8 +136,10 @@ function normalizeUserPath(pathname) {
   return path === '/' ? USER_TAB_PATHS.home : path
 }
 
-function defaultWorkoutForm(participantLimit = 10) {
-  const start = new Date(Date.now() + 24 * 60 * 60 * 1000)
+function defaultWorkoutForm(participantLimit = 10, minLeadHours = 0) {
+  const minLeadMs = Math.max(0, Number(minLeadHours) || 0) * 60 * 60 * 1000
+  const defaultLeadMs = Math.max(24 * 60 * 60 * 1000, minLeadMs)
+  const start = new Date(Date.now() + defaultLeadMs)
   start.setMinutes(0, 0, 0)
 
   return {
@@ -166,6 +168,7 @@ export function UserApp({ user, onLogout }) {
   const [filters, setFilters] = useState(EMPTY_FILTERS)
   const [form, setForm] = useState(defaultWorkoutForm)
   const [defaultParticipantLimit, setDefaultParticipantLimit] = useState(10)
+  const [workoutCreateMinLeadHours, setWorkoutCreateMinLeadHours] = useState(0)
   const [profile, setProfile] = useState(() => profileFromUser(user))
   const [loading, setLoading] = useState(true)
   const [profileLoading, setProfileLoading] = useState(false)
@@ -369,9 +372,16 @@ export function UserApp({ user, onLogout }) {
       .settings()
       .then((data) => {
         const limit = Number(data.settings?.default_participant_limit)
-        if (ignore || !Number.isFinite(limit)) return
-        setDefaultParticipantLimit(limit)
-        setForm(defaultWorkoutForm(limit))
+        const minLeadHours = Number(data.settings?.workout_create_min_lead_hours)
+        const safeMinLeadHours = Number.isFinite(minLeadHours) ? Math.max(0, minLeadHours) : 0
+        if (ignore) return
+        if (Number.isFinite(safeMinLeadHours)) {
+          setWorkoutCreateMinLeadHours(safeMinLeadHours)
+        }
+        if (Number.isFinite(limit)) {
+          setDefaultParticipantLimit(limit)
+          setForm(defaultWorkoutForm(limit, safeMinLeadHours))
+        }
       })
       .catch(() => {})
 
@@ -495,7 +505,7 @@ export function UserApp({ user, onLogout }) {
     navigate(USER_TAB_PATHS[tab] || USER_TAB_PATHS.home)
     setMessage(null)
     if (tab === 'create') {
-      setForm(defaultWorkoutForm(defaultParticipantLimit))
+      setForm(defaultWorkoutForm(defaultParticipantLimit, workoutCreateMinLeadHours))
     }
   }
 
@@ -829,6 +839,7 @@ export function UserApp({ user, onLogout }) {
             form={form}
             setForm={setForm}
             saving={saving}
+            minLeadHours={workoutCreateMinLeadHours}
             onSubmit={saveWorkout}
           />
         )}
@@ -1641,8 +1652,10 @@ function RatingPicker({ disabled, onChange, value = 0 }) {
   )
 }
 
-function WorkoutForm({ mode, form, setForm, saving, onSubmit }) {
+function WorkoutForm({ mode, form, setForm, saving, minLeadHours = 0, onSubmit }) {
   const set = (key) => (event) => setForm((prev) => ({ ...prev, [key]: event.target.value }))
+  const now = new Date()
+  const minStartAt = toLocalInputValue(new Date(now.getTime() + minLeadHours * 60 * 60 * 1000))
 
   return (
     <section className="rt-page">
@@ -1653,7 +1666,13 @@ function WorkoutForm({ mode, form, setForm, saving, onSubmit }) {
         </label>
         <label>
           <span>Дата и время</span>
-          <input value={form.startAt} onChange={set('startAt')} type="datetime-local" required />
+          <input
+            value={form.startAt}
+            onChange={set('startAt')}
+            type="datetime-local"
+            min={minStartAt}
+            required
+          />
         </label>
         <label>
           <span>Длительность, мин</span>

@@ -60,6 +60,25 @@ export function parseWorkoutBody(body) {
   }
 }
 
+export function validateWorkoutStart(startAt, settings = {}, nowDate = new Date()) {
+  const startDate = new Date(startAt)
+  if (Number.isNaN(startDate.getTime())) {
+    throw badRequest('Некорректная дата тренировки')
+  }
+
+  if (startDate <= nowDate) {
+    throw badRequest('Нельзя создать тренировку в прошлом')
+  }
+
+  const minLeadHours = Math.max(0, Number(settings.workout_create_min_lead_hours || 0))
+  if (!minLeadHours) return
+
+  const minStartDate = new Date(nowDate.getTime() + minLeadHours * 60 * 60 * 1000)
+  if (startDate < minStartDate) {
+    throw badRequest(`Тренировку нужно создавать минимум за ${minLeadHours} ч. до начала`)
+  }
+}
+
 function assertNumberInRange(value, limits, label) {
   if (!Number.isFinite(value) || value < limits.min || value > limits.max) {
     throw badRequest(`${label}: укажите число от ${limits.min} до ${limits.max}`)

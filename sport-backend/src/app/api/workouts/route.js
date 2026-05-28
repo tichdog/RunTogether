@@ -3,7 +3,7 @@ import { dbId, prisma } from '@/lib/server/db'
 import { forbidden } from '@/lib/server/http-error'
 import { json, readJson, route } from '@/lib/server/response'
 import { getSettings } from '@/lib/services/settings'
-import { parseWorkoutBody } from '@/lib/repositories/workouts'
+import { parseWorkoutBody, validateWorkoutStart } from '@/lib/repositories/workouts'
 import {
   buildWorkoutRows,
   syncWorkoutStatus,
@@ -101,6 +101,7 @@ export const POST = route(async (request) => {
   }
 
   const data = parseWorkoutBody(await readJson(request))
+  validateWorkoutStart(data.startAt, settings)
   const workout = await prisma.$transaction(async (tx) => {
     const created = await tx.workouts.create({
       data: {

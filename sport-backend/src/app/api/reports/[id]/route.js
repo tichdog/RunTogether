@@ -11,7 +11,7 @@ function banUntilFromBody(body) {
 
   const days = Number(body.banDays || body.days)
   if (!Number.isFinite(days) || days <= 0) {
-    throw badRequest('РЈРєР°Р¶РёС‚Рµ СЃСЂРѕРє Р±Р°РЅР° РІ РґРЅСЏС…')
+    throw badRequest('Укажите срок бана в днях')
   }
 
   return new Date(Date.now() + days * 24 * 60 * 60 * 1000)
@@ -20,12 +20,12 @@ function banUntilFromBody(body) {
 function ensureCanModerateTarget(moderator, target) {
   if (Number(moderator.id) === Number(target.id)) {
     throw badRequest(
-      'РќРµР»СЊР·СЏ РјРѕРґРµСЂРёСЂРѕРІР°С‚СЊ Р¶Р°Р»РѕР±Сѓ РЅР° СЃР°РјРѕРіРѕ СЃРµР±СЏ'
+      'Нельзя модерировать жалобу на самого себя'
     )
   }
   if (isAdmin(target) && moderator.role !== 'super_admin') {
     throw forbidden(
-      'РњРѕРґРµСЂРёСЂРѕРІР°С‚СЊ Р°РґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂРѕРІ РјРѕР¶РµС‚ С‚РѕР»СЊРєРѕ СЃСѓРїРµСЂ-Р°РґРјРёРЅ'
+      'Модерировать администраторов может только супер-админ'
     )
   }
 }
@@ -47,7 +47,7 @@ export const PATCH = route(async (request, context) => {
   const moderatorComment = String(body.moderatorComment || body.comment || '').trim()
 
   if (!['warn', 'ban', 'dismiss', 'reviewed', 'dismissed'].includes(action)) {
-    throw badRequest('РќРµРєРѕСЂСЂРµРєС‚РЅРѕРµ СЂРµС€РµРЅРёРµ РїРѕ Р¶Р°Р»РѕР±Рµ')
+    throw badRequest('Некорректное решение по жалобе')
   }
 
   await prisma.$transaction(async (tx) => {
@@ -55,7 +55,7 @@ export const PATCH = route(async (request, context) => {
       where: { id: dbId(id) },
       include: { users_reports_reported_user_idTousers: true },
     })
-    if (!report) throw notFound('Р–Р°Р»РѕР±Р° РЅРµ РЅР°Р№РґРµРЅР°')
+    if (!report) throw notFound('Жалоба не найдена')
 
     const target = report.users_reports_reported_user_idTousers
     ensureCanModerateTarget(user, target)
@@ -79,6 +79,7 @@ export const PATCH = route(async (request, context) => {
       const warningText = String(
         body.warningText || report.reason || 'Предупреждение по жалобе'
       ).trim()
+      const warningMessage = moderatorComment || warningText
       await tx.user_warnings.create({
         data: {
           user_id: report.reported_user_id,
@@ -110,8 +111,12 @@ export const PATCH = route(async (request, context) => {
         userId: report.reported_user_id,
         type: 'moderation_warning',
         title: 'Предупреждение от модератора',
-        message: warningText,
-        payload: { reportId: Number(id) },
+        message: warningMessage,
+        payload: {
+          reportId: Number(id),
+          reason: warningText,
+          moderatorComment: moderatorComment || null,
+        },
       })
       return
     }

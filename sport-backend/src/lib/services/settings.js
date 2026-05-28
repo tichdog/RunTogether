@@ -6,6 +6,7 @@ const DEFAULTS = {
   require_phone_verification: false,
   default_participant_limit: 20,
   auto_block_complaints_count: 10,
+  workout_create_min_lead_hours: 2,
   workout_archive_retention_days: 90,
   review_window_days: 7,
   notification_retention_days: 30,

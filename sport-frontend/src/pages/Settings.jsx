@@ -124,6 +124,17 @@ export function Settings({ currentUser }) {
             />
           </label>
           <label style={numberRow}>
+            <span>Минимум часов до начала тренировки</span>
+            <Input
+              type="number"
+              value={settings.workout_create_min_lead_hours}
+              min={0}
+              step={0.5}
+              onChange={(e) => set('workout_create_min_lead_hours')(Number(e.target.value))}
+              style={{ width: 90 }}
+            />
+          </label>
+          <label style={numberRow}>
             <span>Дней на отзыв после тренировки</span>
             <Input
               type="number"
