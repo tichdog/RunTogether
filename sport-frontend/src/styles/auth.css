@@ -254,6 +254,16 @@
   font-size: 13px;
 }
 
+.turnstile-field {
+  display: grid;
+  gap: 6px;
+  min-height: 72px;
+}
+
+.turnstile-widget {
+  min-height: 65px;
+}
+
 .auth-submit,
 .auth-switch {
   border: none;

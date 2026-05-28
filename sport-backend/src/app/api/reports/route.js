@@ -13,16 +13,16 @@ export const POST = route(async (request) => {
   const details = String(body.details || '').trim()
 
   if (!reportedUserId || !reason)
-    throw badRequest('РЈРєР°Р¶РёС‚Рµ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ Рё РїСЂРёС‡РёРЅСѓ Р¶Р°Р»РѕР±С‹')
+    throw badRequest('Укажите пользователя и причину жалобы')
   if (Number(reportedUserId) === Number(user.id))
-    throw badRequest('РќРµР»СЊР·СЏ РѕС‚РїСЂР°РІРёС‚СЊ Р¶Р°Р»РѕР±Сѓ РЅР° СЃРµР±СЏ')
+    throw badRequest('Нельзя отправить жалобу на себя')
 
   const report = await prisma.$transaction(async (tx) => {
     const target = await tx.users.findUnique({
       where: { id: dbId(reportedUserId) },
       select: { id: true, role: true },
     })
-    if (!target) throw badRequest('РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ РЅРµ РЅР°Р№РґРµРЅ')
+    if (!target) throw badRequest('Пользователь не найден')
 
     const existing = await tx.reports.findFirst({
       where: {
@@ -34,7 +34,7 @@ export const POST = route(async (request) => {
     })
     if (existing)
       throw badRequest(
-        'РЈ РІР°СЃ СѓР¶Рµ РµСЃС‚СЊ РѕС‚РєСЂС‹С‚Р°СЏ Р¶Р°Р»РѕР±Р° РЅР° СЌС‚РѕРіРѕ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ'
+        'У вас уже есть открытая жалоба на этого пользователя'
       )
 
     const created = await tx.reports.create({
@@ -59,7 +59,7 @@ export const POST = route(async (request) => {
         data: {
           account_status: 'blocked',
           blocked_until: null,
-          block_reason: `РђРІС‚РѕР±Р°РЅ: ${openReports.length} РѕС‚РєСЂС‹С‚С‹С… Р¶Р°Р»РѕР±`,
+          block_reason: `Автобан: ${openReports.length} открытых жалоб`,
           updated_at: now(),
         },
       })

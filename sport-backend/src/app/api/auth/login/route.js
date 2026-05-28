@@ -4,10 +4,17 @@ import { HttpError, badRequest } from '@/lib/server/http-error'
 import { createAuthSession, refreshExpiredBlock, setAuthCookies } from '@/lib/server/auth'
 import { publicUser } from '@/lib/mappers/user'
 import { json, readJson, route } from '@/lib/server/response'
+import { assertRateLimit } from '@/lib/server/rate-limit'
 
 const EMAIL_RE = /^[A-Za-z0-9._%+-]{2,64}@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/
 
 export const POST = route(async (request) => {
+  assertRateLimit(request, {
+    keyPrefix: 'auth:login',
+    limit: 5,
+    windowMs: 60 * 1000,
+  })
+
   const body = await readJson(request)
   const rawLogin = String(body.login || '').trim()
   const login = rawLogin.toLowerCase()

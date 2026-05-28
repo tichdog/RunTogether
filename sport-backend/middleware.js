@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server'
 
 function allowedOrigins() {
+  if (process.env.NODE_ENV === 'production' && !process.env.CLIENT_ORIGIN) {
+    throw new Error('Missing required environment variable: CLIENT_ORIGIN')
+  }
+
   return (process.env.CLIENT_ORIGIN || 'http://localhost:5173,http://localhost:5174')
     .split(',')
     .map((origin) => origin.trim())

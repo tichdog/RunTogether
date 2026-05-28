@@ -875,6 +875,11 @@
   background: var(--rt-surface-soft);
 }
 
+.rt-review-target.has-form {
+  align-items: start;
+  grid-template-columns: 38px minmax(0, 1fr) auto;
+}
+
 .rt-review-target strong,
 .rt-review-target span {
   display: block;
@@ -918,6 +923,44 @@
 .rt-stars button:disabled {
   cursor: default;
   opacity: 0.5;
+}
+
+.rt-stars button.active {
+  color: #8a5a0a;
+}
+
+.rt-review-form,
+.rt-review-result {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 10px;
+}
+
+.rt-review-form textarea {
+  width: 100%;
+  min-height: 92px;
+  padding: 10px 12px;
+  border: 1px solid var(--rt-border);
+  border-radius: 8px;
+  background: var(--rt-surface);
+  color: var(--rt-text);
+  font: inherit;
+  resize: vertical;
+}
+
+.rt-review-form .rt-primary {
+  min-height: 40px;
+  justify-self: flex-start;
+}
+
+.rt-review-result {
+  color: var(--rt-muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.rt-review-result p {
+  margin: 0;
 }
 
 .rt-primary,
@@ -1009,18 +1052,46 @@
   gap: 8px;
 }
 
+.rt-profile-page {
+  display: grid;
+  gap: 22px;
+}
+
+.rt-profile-page > .rt-stats,
+.rt-profile-page > .rt-achievements-panel,
+.rt-profile-page > .rt-moderation-panel {
+  margin: 0;
+}
+
 .rt-profile-head {
   gap: 16px;
-  margin-bottom: 20px;
+  margin-bottom: 0;
+}
+
+.rt-profile-avatar-wrap {
+  align-self: flex-start;
+}
+
+.rt-profile-main {
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+  align-content: center;
 }
 
 .rt-profile-head h1 {
-  margin: 0 0 4px;
+  margin: 0;
   font-size: 30px;
+  line-height: 1.05;
 }
 
-.rt-profile-head span {
+.rt-profile-email {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
   color: var(--rt-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .rt-moderation-panel {
@@ -1031,6 +1102,67 @@
 .rt-notification-list {
   display: grid;
   gap: 10px;
+}
+
+.rt-notification-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.rt-notification-filters button {
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  border: 1px solid var(--rt-border);
+  border-radius: 8px;
+  background: var(--rt-surface);
+  color: var(--rt-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.rt-notification-filters button.active {
+  border-color: var(--rt-text);
+  background: var(--rt-text);
+  color: #fff;
+}
+
+.rt-notification-filters em {
+  min-width: 22px;
+  min-height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: var(--rt-surface-soft);
+  color: var(--rt-muted);
+  font-size: 11px;
+  font-style: normal;
+}
+
+.rt-notification-filters button.active em {
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+}
+
+.rt-notification-groups {
+  display: grid;
+  gap: 18px;
+}
+
+.rt-notification-group h2 {
+  margin: 0 0 8px;
+  color: var(--rt-muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
 }
 
 .rt-notification-head {
@@ -1074,6 +1206,38 @@
 .rt-notification p,
 .rt-notification span {
   display: block;
+}
+
+.rt-notification-kind {
+  width: fit-content;
+  margin: 0 0 8px !important;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: var(--rt-soft);
+  color: var(--rt-accent-strong) !important;
+  font-size: 11px !important;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.rt-notification-kind.reviews {
+  background: #e5ecff;
+  color: #395fc0 !important;
+}
+
+.rt-notification-kind.requests {
+  background: #fff4ce;
+  color: var(--rt-warning) !important;
+}
+
+.rt-notification-kind.workouts {
+  background: #e5f7dc;
+  color: #246a35 !important;
+}
+
+.rt-notification-kind.moderation {
+  background: #fff0f0;
+  color: var(--rt-danger) !important;
 }
 
 .rt-notification p {
@@ -1183,7 +1347,7 @@
 .rt-avatar-upload {
   display: inline-flex;
   align-items: center;
-  margin-top: 10px;
+  justify-self: flex-start;
 }
 
 .rt-avatar-upload input {
@@ -1196,11 +1360,12 @@
 }
 
 .rt-avatar-upload span {
-  min-height: 34px;
+  min-height: 36px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0 12px;
+  gap: 8px;
+  padding: 0 14px;
   border: 1px solid var(--rt-border);
   border-radius: 8px;
   background: var(--rt-surface);
@@ -1208,6 +1373,17 @@
   cursor: pointer;
   font-size: 13px;
   font-weight: 800;
+  line-height: 1;
+}
+
+.rt-avatar-upload .rt-icon {
+  width: 17px;
+  height: 17px;
+}
+
+.rt-avatar-upload input:disabled + span {
+  cursor: default;
+  opacity: 0.6;
 }
 
 .rt-avatar {

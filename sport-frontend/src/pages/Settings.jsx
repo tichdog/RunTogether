@@ -124,6 +124,37 @@ export function Settings({ currentUser }) {
             />
           </label>
           <label style={numberRow}>
+            <span>Минимум часов до начала тренировки</span>
+            <Input
+              type="number"
+              value={settings.workout_create_min_lead_hours}
+              min={0}
+              step={0.5}
+              onChange={(e) => set('workout_create_min_lead_hours')(Number(e.target.value))}
+              style={{ width: 90 }}
+            />
+          </label>
+          <label style={numberRow}>
+            <span>Дней на отзыв после тренировки</span>
+            <Input
+              type="number"
+              value={settings.review_window_days}
+              min={1}
+              onChange={(e) => set('review_window_days')(Number(e.target.value))}
+              style={{ width: 90 }}
+            />
+          </label>
+          <label style={numberRow}>
+            <span>Хранить уведомления, дней</span>
+            <Input
+              type="number"
+              value={settings.notification_retention_days}
+              min={1}
+              onChange={(e) => set('notification_retention_days')(Number(e.target.value))}
+              style={{ width: 90 }}
+            />
+          </label>
+          <label style={numberRow}>
             <span>
               Хранить архив тренировок, дней
               {!isSuperAdmin && (

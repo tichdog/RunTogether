@@ -3,6 +3,17 @@ import { createNotification } from '../services/notifications'
 import { getSettings } from '../services/settings'
 import { syncWorkoutStatus } from '../services/workouts'
 
+const EXPIRING_NOTIFICATION_TYPES = [
+  'participation_request',
+  'participation_response',
+  'participation_removed',
+  'workout_cancelled',
+  'workout_changed',
+  'workout_created',
+  'workout_reminder',
+  'workout_review',
+]
+
 export async function createReminderNotifications() {
   const now = new Date()
   const dayAhead = new Date(now.getTime() + 24 * 60 * 60 * 1000)
@@ -70,6 +81,19 @@ export async function deleteExpiredArchivedWorkouts() {
     where: {
       status: 'archived',
       updated_at: { lt: cutoff },
+    },
+  })
+  return result.count
+}
+
+export async function deleteExpiredNotifications() {
+  const settings = await getSettings()
+  const retentionDays = Math.max(1, Number(settings.notification_retention_days) || 30)
+  const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000)
+  const result = await prisma.notifications.deleteMany({
+    where: {
+      type: { in: EXPIRING_NOTIFICATION_TYPES },
+      created_at: { lt: cutoff },
     },
   })
   return result.count

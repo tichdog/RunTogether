@@ -88,18 +88,16 @@ export async function evaluateAchievements(client = prisma, userId) {
 
     if (!matches) continue
 
-    let inserted = false
-    try {
-      await client.user_achievements.create({
-        data: {
+    const result = await client.user_achievements.createMany({
+      data: [
+        {
           user_id: dbId(userId),
           achievement_id: achievement.id,
         },
-      })
-      inserted = true
-    } catch (error) {
-      if (error.code !== 'P2002') throw error
-    }
+      ],
+      skipDuplicates: true,
+    })
+    const inserted = result.count > 0
 
     if (inserted) {
       clearAchievementsCache()

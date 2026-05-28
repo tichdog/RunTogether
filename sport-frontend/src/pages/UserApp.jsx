@@ -136,8 +136,10 @@ function normalizeUserPath(pathname) {
   return path === '/' ? USER_TAB_PATHS.home : path
 }
 
-function defaultWorkoutForm(participantLimit = 10) {
-  const start = new Date(Date.now() + 24 * 60 * 60 * 1000)
+function defaultWorkoutForm(participantLimit = 10, minLeadHours = 0) {
+  const minLeadMs = Math.max(0, Number(minLeadHours) || 0) * 60 * 60 * 1000
+  const defaultLeadMs = Math.max(24 * 60 * 60 * 1000, minLeadMs)
+  const start = new Date(Date.now() + defaultLeadMs)
   start.setMinutes(0, 0, 0)
 
   return {
@@ -166,6 +168,7 @@ export function UserApp({ user, onLogout }) {
   const [filters, setFilters] = useState(EMPTY_FILTERS)
   const [form, setForm] = useState(defaultWorkoutForm)
   const [defaultParticipantLimit, setDefaultParticipantLimit] = useState(10)
+  const [workoutCreateMinLeadHours, setWorkoutCreateMinLeadHours] = useState(0)
   const [profile, setProfile] = useState(() => profileFromUser(user))
   const [loading, setLoading] = useState(true)
   const [profileLoading, setProfileLoading] = useState(false)
@@ -369,9 +372,16 @@ export function UserApp({ user, onLogout }) {
       .settings()
       .then((data) => {
         const limit = Number(data.settings?.default_participant_limit)
-        if (ignore || !Number.isFinite(limit)) return
-        setDefaultParticipantLimit(limit)
-        setForm(defaultWorkoutForm(limit))
+        const minLeadHours = Number(data.settings?.workout_create_min_lead_hours)
+        const safeMinLeadHours = Number.isFinite(minLeadHours) ? Math.max(0, minLeadHours) : 0
+        if (ignore) return
+        if (Number.isFinite(safeMinLeadHours)) {
+          setWorkoutCreateMinLeadHours(safeMinLeadHours)
+        }
+        if (Number.isFinite(limit)) {
+          setDefaultParticipantLimit(limit)
+          setForm(defaultWorkoutForm(limit, safeMinLeadHours))
+        }
       })
       .catch(() => {})
 
@@ -495,7 +505,7 @@ export function UserApp({ user, onLogout }) {
     navigate(USER_TAB_PATHS[tab] || USER_TAB_PATHS.home)
     setMessage(null)
     if (tab === 'create') {
-      setForm(defaultWorkoutForm(defaultParticipantLimit))
+      setForm(defaultWorkoutForm(defaultParticipantLimit, workoutCreateMinLeadHours))
     }
   }
 
@@ -690,16 +700,19 @@ export function UserApp({ user, onLogout }) {
     }
   }
 
-  const saveReview = async (revieweeId, rating) => {
+  const saveReview = async (revieweeId, rating, text = '') => {
     if (!selectedWorkout) return
 
     setSaving(true)
     setMessage(null)
     try {
-      await api.createReview(selectedWorkout.id, { revieweeId, rating })
+      await api.createReview(selectedWorkout.id, { revieweeId, rating, text })
       const data = await api.reviewTargets(selectedWorkout.id)
       setReviewTargets(data.reviewTargets || [])
-      setMessage({ type: 'success', text: 'Оценка сохранена' })
+      setMessage({
+        type: 'success',
+        text: text ? 'Отзыв отправлен организатору' : 'Оценка сохранена',
+      })
     } catch (error) {
       setMessage({ type: 'error', text: error.message })
     } finally {
@@ -826,6 +839,7 @@ export function UserApp({ user, onLogout }) {
             form={form}
             setForm={setForm}
             saving={saving}
+            minLeadHours={workoutCreateMinLeadHours}
             onSubmit={saveWorkout}
           />
         )}
@@ -1520,39 +1534,55 @@ function UserListItem({ user, label, onOpen, currentUserId }) {
 
 function ReviewPanel({ targets = [], saving, onReview, currentUserId }) {
   const ratedCount = targets.filter((target) => target.review).length
+  const hasPendingReviews = targets.some((target) => !target.review)
+  const canReview = targets.some((target) => target.canReview && !target.review)
+  const expiresAt = targets.find((target) => target.reviewExpiresAt)?.reviewExpiresAt
 
   return (
     <div className="rt-panel">
       <SectionHead
-        title="Оценки"
-        caption={targets.length ? `${ratedCount}/${targets.length} оценено` : 'после тренировки'}
+        title="Отзывы"
+        caption={targets.length ? `${ratedCount}/${targets.length} оставлено` : 'после тренировки'}
       />
       {!targets.length ? (
         <p className="rt-muted">
-          Оценить можно только организатора или подтвержденных участников завершенной тренировки.
+          Оставить отзыв можно только по завершенной тренировке, где вы были организатором или
+          подтвержденным участником.
         </p>
       ) : (
-        <div className="rt-review-list">
-          {targets.map((target) => (
-            <ReviewTarget
-              key={target.user.id}
-              target={target}
-              saving={saving}
-              currentUserId={currentUserId}
-              onReview={(rating) => onReview(target.user.id, rating)}
-            />
-          ))}
-        </div>
+        <>
+          {hasPendingReviews && !canReview && (
+            <p className="rt-muted">
+              {expiresAt
+                ? `Срок для новых отзывов истек ${new Date(expiresAt).toLocaleDateString()}.`
+                : 'Срок для новых отзывов истек.'}
+            </p>
+          )}
+          <div className="rt-review-list">
+            {targets.map((target) => (
+              <ReviewTargetV2
+                key={target.user.id}
+                target={target}
+                saving={saving}
+                currentUserId={currentUserId}
+                onReview={(rating, text) => onReview(target.user.id, rating, text)}
+              />
+            ))}
+          </div>
+        </>
       )}
     </div>
   )
 }
 
-function ReviewTarget({ target, saving, onReview, currentUserId }) {
+function ReviewTargetV2({ target, saving, onReview, currentUserId }) {
   const user = target.user
+  const canReview = Boolean(target.canReview)
 
   return (
-    <article className="rt-review-target">
+    <article
+      className={`rt-review-target ${target.isOrganizer && !target.review ? 'has-form' : ''}`}
+    >
       <Avatar user={user} />
       <div>
         <strong>{user.name}</strong>
@@ -1563,24 +1593,57 @@ function ReviewTarget({ target, saving, onReview, currentUserId }) {
       </div>
       <ReportUserButton user={user} currentUserId={currentUserId} compact />
       {target.review ? (
-        <span className="rt-review-done">{stars(target.review.rating)}</span>
+        <div className="rt-review-result">
+          <span className="rt-review-done">{stars(target.review.rating)}</span>
+          {target.review.text && <p>{target.review.text}</p>}
+        </div>
+      ) : target.isOrganizer ? (
+        <OrganizerReviewForm disabled={saving || !canReview} onReview={onReview} />
       ) : (
-        <StarPicker disabled={saving} onChange={onReview} />
+        <RatingPicker disabled={saving || !canReview} onChange={onReview} />
       )}
     </article>
   )
 }
 
-function StarPicker({ disabled, onChange }) {
+function OrganizerReviewForm({ disabled, onReview }) {
+  const [rating, setRating] = useState(5)
+  const [text, setText] = useState('')
+  const trimmed = text.trim()
+
+  return (
+    <div className="rt-review-form">
+      <RatingPicker disabled={disabled} value={rating} onChange={setRating} />
+      <textarea
+        value={text}
+        onChange={(event) => setText(event.target.value)}
+        maxLength={1000}
+        placeholder="Что было хорошо, что можно улучшить"
+        disabled={disabled}
+      />
+      <button
+        className="rt-primary"
+        type="button"
+        disabled={disabled || !trimmed}
+        onClick={() => onReview(rating, trimmed)}
+      >
+        Отправить отзыв
+      </button>
+    </div>
+  )
+}
+
+function RatingPicker({ disabled, onChange, value = 0 }) {
   return (
     <div className="rt-stars" aria-label="Оценка">
-      {[1, 2, 3, 4, 5].map((value) => (
+      {[1, 2, 3, 4, 5].map((ratingValue) => (
         <button
-          key={value}
+          key={ratingValue}
           type="button"
           disabled={disabled}
-          onClick={() => onChange(value)}
-          aria-label={`${value} из 5`}
+          onClick={() => onChange(ratingValue)}
+          className={Number(value) > 0 && ratingValue <= Number(value) ? 'active' : ''}
+          aria-label={`${ratingValue} из 5`}
         >
           ★
         </button>
@@ -1589,8 +1652,10 @@ function StarPicker({ disabled, onChange }) {
   )
 }
 
-function WorkoutForm({ mode, form, setForm, saving, onSubmit }) {
+function WorkoutForm({ mode, form, setForm, saving, minLeadHours = 0, onSubmit }) {
   const set = (key) => (event) => setForm((prev) => ({ ...prev, [key]: event.target.value }))
+  const now = new Date()
+  const minStartAt = toLocalInputValue(new Date(now.getTime() + minLeadHours * 60 * 60 * 1000))
 
   return (
     <section className="rt-page">
@@ -1601,7 +1666,13 @@ function WorkoutForm({ mode, form, setForm, saving, onSubmit }) {
         </label>
         <label>
           <span>Дата и время</span>
-          <input value={form.startAt} onChange={set('startAt')} type="datetime-local" required />
+          <input
+            value={form.startAt}
+            onChange={set('startAt')}
+            type="datetime-local"
+            min={minStartAt}
+            required
+          />
         </label>
         <label>
           <span>Длительность, мин</span>
@@ -1722,15 +1793,20 @@ function ProfileScreen({
     ['male', 'female'].includes(profile.gender)
 
   return (
-    <section className="rt-page">
+    <section className="rt-page rt-profile-page">
       <div className="rt-profile-head">
-        <Avatar user={user} large />
-        <div>
+        <div className="rt-profile-avatar-wrap">
+          <Avatar user={user} large />
+        </div>
+        <div className="rt-profile-main">
           <h1>{user.name}</h1>
-          <span>{user.email || 'Email скрыт'}</span>
+          <span className="rt-profile-email">{user.email || 'Email скрыт'}</span>
           <label className="rt-avatar-upload">
             <input type="file" accept="image/*" onChange={uploadAvatar} disabled={saving} />
-            <span>{saving ? 'Загрузка...' : 'Загрузить фото'}</span>
+            <span>
+              <Icon name="camera" />
+              {saving ? 'Загрузка...' : 'Загрузить фото'}
+            </span>
           </label>
         </div>
       </div>
@@ -1824,12 +1900,22 @@ function ModerationNoticeList({ user, notifications = [] }) {
 }
 
 function NotificationsScreen({ notifications, readingAll, onRead, onReadAll }) {
+  const [filter, setFilter] = useState('all')
   const unreadCount = notifications.filter((item) => !item.read_at).length
+  const filters = notificationFilters(notifications)
+  const visibleNotifications =
+    filter === 'all'
+      ? notifications
+      : notifications.filter((notification) => notificationGroupId(notification.type) === filter)
+  const groupedNotifications = groupNotificationsByDay(visibleNotifications)
 
   return (
     <section className="rt-page">
       <div className="rt-notification-head">
-        <SectionHead title="Уведомления" caption={`${unreadCount} новых`} />
+        <SectionHead
+          title="Уведомления"
+          caption={`${unreadCount} новых · ${notifications.length} всего`}
+        />
         <button
           className="rt-secondary"
           type="button"
@@ -1839,20 +1925,48 @@ function NotificationsScreen({ notifications, readingAll, onRead, onReadAll }) {
           {readingAll ? 'Обновляем...' : 'Прочитать все'}
         </button>
       </div>
-      <div className="rt-notification-list">
-        {notifications.map((notification) => (
-          <NotificationItem
-            key={notification.id}
-            notification={notification}
-            onRead={() => onRead(notification.id)}
-          />
+
+      {!!notifications.length && (
+        <div className="rt-notification-filters" aria-label="Фильтр уведомлений">
+          {filters.map((item) => (
+            <button
+              key={item.id}
+              className={filter === item.id ? 'active' : ''}
+              type="button"
+              onClick={() => setFilter(item.id)}
+            >
+              <span>{item.label}</span>
+              <em>{item.count}</em>
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div className="rt-notification-groups">
+        {groupedNotifications.map((group) => (
+          <section className="rt-notification-group" key={group.key}>
+            <h2>{group.label}</h2>
+            <div className="rt-notification-list">
+              {group.items.map((notification) => (
+                <NotificationItem
+                  key={notification.id}
+                  notification={notification}
+                  onRead={() => onRead(notification.id)}
+                />
+              ))}
+            </div>
+          </section>
         ))}
       </div>
+
       {!notifications.length && (
         <EmptyState
           title="Уведомлений пока нет"
           text="Предупреждения и решения администрации появятся здесь."
         />
+      )}
+      {!!notifications.length && !visibleNotifications.length && (
+        <EmptyState title="В этой группе пусто" text="Попробуйте другой фильтр уведомлений." />
       )}
     </section>
   )
@@ -1860,11 +1974,15 @@ function NotificationsScreen({ notifications, readingAll, onRead, onReadAll }) {
 
 function NotificationItem({ notification, compact = false, onRead }) {
   const isModeration = ['moderation_warning', 'moderation_ban'].includes(notification.type)
+  const meta = notificationTypeMeta(notification.type)
   return (
     <article
       className={`rt-notification ${notification.read_at ? '' : 'unread'} ${isModeration ? 'moderation' : ''}`}
     >
       <div>
+        {!compact && (
+          <span className={`rt-notification-kind ${meta.group}`}>{meta.label}</span>
+        )}
         <strong>{notification.title}</strong>
         <p>{notification.message}</p>
         {!compact && <span>{new Date(notification.created_at).toLocaleString()}</span>}
@@ -1876,6 +1994,80 @@ function NotificationItem({ notification, compact = false, onRead }) {
       )}
     </article>
   )
+}
+
+function notificationTypeMeta(type) {
+  const meta = {
+    participation_request: { group: 'requests', label: 'Заявка' },
+    participation_response: { group: 'requests', label: 'Заявка' },
+    participation_removed: { group: 'requests', label: 'Участие' },
+    workout_review: { group: 'reviews', label: 'Отзыв' },
+    workout_created: { group: 'workouts', label: 'Тренировка' },
+    workout_changed: { group: 'workouts', label: 'Изменение' },
+    workout_cancelled: { group: 'workouts', label: 'Отмена' },
+    workout_reminder: { group: 'workouts', label: 'Напоминание' },
+    moderation_warning: { group: 'moderation', label: 'Модерация' },
+    moderation_ban: { group: 'moderation', label: 'Модерация' },
+    achievement: { group: 'system', label: 'Достижение' },
+  }
+
+  return meta[type] || { group: 'system', label: 'Система' }
+}
+
+function notificationGroupId(type) {
+  return notificationTypeMeta(type).group
+}
+
+function notificationFilters(notifications) {
+  const labels = {
+    all: 'Все',
+    requests: 'Заявки',
+    reviews: 'Отзывы',
+    workouts: 'Тренировки',
+    moderation: 'Модерация',
+    system: 'Система',
+  }
+  const counts = notifications.reduce(
+    (acc, notification) => {
+      const group = notificationGroupId(notification.type)
+      acc.all += 1
+      acc[group] = (acc[group] || 0) + 1
+      return acc
+    },
+    { all: 0 }
+  )
+
+  return ['all', 'requests', 'reviews', 'workouts', 'moderation', 'system']
+    .filter((id) => id === 'all' || counts[id])
+    .map((id) => ({ id, label: labels[id], count: counts[id] || 0 }))
+}
+
+function groupNotificationsByDay(notifications) {
+  const today = new Date()
+  const yesterday = new Date(today)
+  yesterday.setDate(today.getDate() - 1)
+  const groups = new Map()
+
+  for (const notification of notifications) {
+    const date = new Date(notification.created_at)
+    const key = date.toDateString()
+    if (!groups.has(key)) {
+      groups.set(key, {
+        key,
+        label: notificationDayLabel(date, today, yesterday),
+        items: [],
+      })
+    }
+    groups.get(key).items.push(notification)
+  }
+
+  return [...groups.values()]
+}
+
+function notificationDayLabel(date, today, yesterday) {
+  if (date.toDateString() === today.toDateString()) return 'Сегодня'
+  if (date.toDateString() === yesterday.toDateString()) return 'Вчера'
+  return date.toLocaleDateString()
 }
 
 function WorkoutList({ workouts, userId, onOpen, saving, onJoin, onLeave, empty }) {
@@ -2374,10 +2566,13 @@ function Icon({ name }) {
     ),
     runner: (
       <>
-        <circle cx="13" cy="4" r="2" />
-        <path d="M9 21l3-7-4-2-2 4" />
-        <path d="M14 8l-2 6 5 2" />
-        <path d="M10 8l4 2 3-2" />
+        <path d="M6.5 6.5l11 11" />
+        <path d="M21 14l-7 7" />
+        <path d="M3 10l7-7" />
+        <path d="M17 6l1 1" />
+        <path d="M6 17l1 1" />
+        <path d="M19 4l1 1" />
+        <path d="M4 19l1 1" />
       </>
     ),
     clipboard: (
@@ -2451,6 +2646,12 @@ function Icon({ name }) {
         <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
         <path d="M16 17l5-5-5-5" />
         <path d="M21 12H9" />
+      </>
+    ),
+    camera: (
+      <>
+        <path d="M14.5 4l1.4 2H19a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h3.1l1.4-2z" />
+        <circle cx="12" cy="13" r="3" />
       </>
     ),
   }

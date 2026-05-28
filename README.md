@@ -4,31 +4,45 @@
 
 Проект состоит из двух частей:
 
-- `sport-backend` — Next.js API, PostgreSQL, JWT в httpOnly cookie.
-- `sport-frontend` — React frontend для админки и клиентского интерфейса.
+- `sport-backend` - Next.js API, PostgreSQL, Prisma, JWT в httpOnly cookie.
+- `sport-frontend` - React + Vite frontend для админки и клиентского интерфейса.
 
-## Требования
+## Быстрый запуск через Docker
 
-- Node.js 20+
-- npm
-- Docker Desktop для PostgreSQL, grafana, loki, promtail
-- PgAdmin, если удобно смотреть БД через интерфейс
+Нужно установить только Docker Desktop. Node.js, npm, PostgreSQL, Prisma, Grafana и остальные зависимости локально ставить не нужно. Контейнеры используют Node.js 24.
 
-## Быстрый запуск
-
-### 1. Запустить PostgreSQL (через docker контейнер)
-
-Открыть Docker Desktop и дождаться, пока он полностью запустится.
-
-Затем: зайти в папку sport-backend и выполнить
+Из корня проекта:
 
 ```powershell
-docker compose up -d
+docker compose up --build
 ```
 
-PostgreSQL будет доступен на порту `5433`.
+После запуска будут доступны:
 
-Данные БД:
+- frontend: http://localhost:5173
+- backend API: http://localhost:4000/api
+- backend healthcheck: http://localhost:4000/health
+- Grafana: http://localhost:3001
+- PostgreSQL: `localhost:5433`
+- Loki: http://localhost:3100
+
+Если какой-то порт занят, его можно переопределить перед запуском:
+
+```powershell
+$env:BACKEND_PORT = "4010"
+$env:FRONTEND_PORT = "5175"
+$env:CLIENT_ORIGIN = "http://localhost:5175"
+docker compose up --build
+```
+
+Grafana:
+
+```text
+Login: admin
+Password: admin
+```
+
+PostgreSQL:
 
 ```text
 Host: localhost
@@ -38,70 +52,9 @@ User: postgres
 Password: postgres
 ```
 
-### 1.2 Если запуск через PgAdmin
-
-Создать в PgAdmin новую базу данных, и выполнить 2 SQL файла которые лежат в папке бэка.
-Там находятся запросы для создания таблиц и дефолтных значений.  
-В .env файле укажите имя БД и пароль, а так же порт на котором запущена Бд (обычно 5432)
-
-### 1.3 Запуск docker контейнера для логгера 
-```powershell
-  docker compose up -d
-  npm run observability:up
-```
-
-Grafana откроется на порту http://localhost:3001
-```powershell
-Логин: admin
-Пароль: admin
-```
-
-
-### 1.4 Запуск Prisma 
-```powershell
-npm run prisma:generate
-npm run db:studio
-```
-
-### 2. Настроить backend
-
-```powershell
-cd ...\Web\sport-backend
-Copy-Item .env.example .env
-npm install
-npm run dev
-```
-
-Backend запустится на:
-
-```text
-http://localhost:4000
-```
-
-### 3. Запустить frontend
-
-```powershell
-cd ...\Web\sport-frontend
-npm install
-npm run dev
-```
-
-Vite покажет адрес в терминале. Обычно это:
-
-```text
-http://localhost:5173
-```
-
-Если `5173` занят, Vite может открыть, например:
-
-```text
-http://localhost:5174
-```
+При первом запуске PostgreSQL автоматически применяет `sport-backend/src/db/schema.sql` и `sport-backend/src/db/seed.sql`.
 
 ## Тестовый вход
-
-(Если БД была запущена в контейнере)
-После первого запуска Docker-БД автоматически применяются `schema.sql` и `seed.sql`.
 
 Администратор:
 
@@ -120,16 +73,75 @@ Email: mark@sport.local
 Password: Admin12345!
 ```
 
-Администратор попадает в админ-панель. Обычные пользователи попадают в клиентский интерфейс.
+## Остановка
 
-
-## Если БД нужно пересоздать
-
-Команда удалит текущие данные и заново применит схему и seed:
+Остановить контейнеры:
 
 ```powershell
-cd ...\Web\sport-backend
-docker compose down -v
-docker compose up -d
+docker compose down
 ```
 
+Остановить контейнеры и удалить данные PostgreSQL, Grafana и Loki:
+
+```powershell
+docker compose down -v
+```
+
+После `docker compose down -v` следующий запуск заново создаст базу и применит seed.
+
+## Полезные команды
+
+Пересобрать контейнеры:
+
+```powershell
+docker compose up --build
+```
+
+Посмотреть логи всех сервисов:
+
+```powershell
+docker compose logs -f
+```
+
+Посмотреть логи только backend:
+
+```powershell
+docker compose logs -f backend
+```
+
+Зайти в Prisma Studio:
+
+```powershell
+docker compose exec backend npx prisma studio --hostname 0.0.0.0 --port 5555
+```
+
+После запуска Prisma Studio будет доступна на http://localhost:5555.
+
+## Локальный запуск без Docker
+
+Локальный запуск по-прежнему возможен, но для обычного старта проекта предпочтительнее Docker Compose.
+
+Backend:
+
+```powershell
+cd sport-backend
+Copy-Item .env.example .env
+npm install
+npm run dev
+```
+
+Frontend:
+
+```powershell
+cd sport-frontend
+npm install
+npm run dev
+```
+
+Инфраструктура backend отдельно:
+
+```powershell
+cd sport-backend
+docker compose --profile database up -d postgres
+npm run observability:up
+```

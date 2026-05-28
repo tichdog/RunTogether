@@ -3,7 +3,13 @@ import { dbId, now, prisma } from '@/lib/server/db'
 import { badRequest, forbidden, notFound } from '@/lib/server/http-error'
 import { json, readJson, route } from '@/lib/server/response'
 import { notifyWorkoutParticipants } from '@/lib/services/notifications'
-import { getWorkoutRow, isOwnerOrAdmin, parseWorkoutBody } from '@/lib/repositories/workouts'
+import {
+  getWorkoutRow,
+  isOwnerOrAdmin,
+  parseWorkoutBody,
+  validateWorkoutStart,
+} from '@/lib/repositories/workouts'
+import { getSettings } from '@/lib/services/settings'
 import {
   buildWorkoutRows,
   syncWorkoutStatus,
@@ -28,6 +34,8 @@ export const PATCH = route(async (request, context) => {
   const user = await requireAuth(request)
   const { id } = await context.params
   const data = parseWorkoutBody(await readJson(request))
+  const settings = await getSettings()
+  validateWorkoutStart(data.startAt, settings)
   const updated = await prisma.$transaction(async (tx) => {
     const workout = await getWorkoutRow(tx, id)
     if (!workout) throw notFound('РўСЂРµРЅРёСЂРѕРІРєР° РЅРµ РЅР°Р№РґРµРЅР°')
