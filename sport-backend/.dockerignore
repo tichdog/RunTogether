@@ -1,0 +1,8 @@
+node_modules
+.next
+logs
+public/uploads
+src/generated/prisma
+.env
+.env.*
+npm-debug.log*
