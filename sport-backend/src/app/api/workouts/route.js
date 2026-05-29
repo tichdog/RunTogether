@@ -6,21 +6,16 @@ import { getSettings } from '@/lib/services/settings'
 import { parseWorkoutBody, validateWorkoutStart } from '@/lib/repositories/workouts'
 import {
   buildWorkoutRows,
+  shouldShowInActiveWorkouts,
+  shouldShowInWorkoutArchive,
   syncWorkoutStatus,
   workoutInclude,
   workoutPayload,
 } from '@/lib/services/workouts'
 
-function filterArchive(row, archiveOnly, includeArchived) {
-  if (archiveOnly) {
-    return (
-      row.status === 'archived' ||
-      (row.status !== 'cancelled' &&
-        Date.now() >=
-          new Date(row.start_at).getTime() + (Number(row.duration_minutes) + 1440) * 60_000)
-    )
-  }
-  return includeArchived || row.status !== 'archived'
+function filterArchive(row, archiveOnly, includeArchived, currentDate = new Date()) {
+  if (archiveOnly) return shouldShowInWorkoutArchive(row, currentDate)
+  return includeArchived || shouldShowInActiveWorkouts(row, currentDate)
 }
 
 export const GET = route(async (request) => {
@@ -72,8 +67,9 @@ export const GET = route(async (request) => {
     })
   }
 
+  const currentDate = new Date()
   let rows = await buildWorkoutRows(synced, user, { lat, lng })
-  rows = rows.filter((row) => filterArchive(row, archiveOnly, includeArchived))
+  rows = rows.filter((row) => filterArchive(row, archiveOnly, includeArchived, currentDate))
   if (radiusKm != null) {
     rows = rows.filter(
       (row) => row.distance_from_user_km != null && row.distance_from_user_km <= radiusKm
@@ -96,7 +92,7 @@ export const POST = route(async (request) => {
   const settings = await getSettings()
   if (settings.require_verified_to_create_workouts && !user.phone_verified) {
     throw forbidden(
-      'РЎРѕР·РґР°РЅРёРµ С‚СЂРµРЅРёСЂРѕРІРѕРє РґРѕСЃС‚СѓРїРЅРѕ С‚РѕР»СЊРєРѕ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏРј СЃ РїРѕРґС‚РІРµСЂР¶РґРµРЅРЅС‹Рј С‚РµР»РµС„РѕРЅРѕРј'
+      'Создание тренировок доступно только пользователям с подтвержденным телефоном'
     )
   }
 

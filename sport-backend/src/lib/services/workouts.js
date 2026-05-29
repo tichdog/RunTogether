@@ -5,6 +5,8 @@ import { getUserStatsMap } from '../repositories/users'
 
 const TERMINAL = new Set(['cancelled', 'archived'])
 const ARCHIVE_AFTER_MS = 24 * 60 * 60 * 1000
+const ACTIVE_WORKOUT_STATUSES = new Set(['planned', 'open', 'full', 'in_progress'])
+const ARCHIVE_LIST_STATUSES = new Set(['completed', 'archived', 'cancelled'])
 
 export const workoutInclude = {
   users: true,
@@ -13,10 +15,30 @@ export const workoutInclude = {
   },
 }
 
+export function workoutEndAt(workout) {
+  const start = new Date(workout.start_at)
+  return new Date(start.getTime() + Number(workout.duration_minutes || 60) * 60000)
+}
+
+export function hasWorkoutEnded(workout, currentDate = new Date()) {
+  return currentDate >= workoutEndAt(workout)
+}
+
+export function shouldShowInWorkoutArchive(workout, currentDate = new Date()) {
+  if (!workout) return false
+  return ARCHIVE_LIST_STATUSES.has(workout.status) || hasWorkoutEnded(workout, currentDate)
+}
+
+export function shouldShowInActiveWorkouts(workout, currentDate = new Date()) {
+  if (!workout) return false
+  if (shouldShowInWorkoutArchive(workout, currentDate)) return false
+  return ACTIVE_WORKOUT_STATUSES.has(workout.status)
+}
+
 export function deriveWorkoutStatus(workout, confirmedCount = 0, now = new Date()) {
   if (!workout || workout.status === 'cancelled') return workout?.status
   const start = new Date(workout.start_at)
-  const end = new Date(start.getTime() + Number(workout.duration_minutes || 60) * 60000)
+  const end = workoutEndAt(workout)
   const archiveAt = new Date(end.getTime() + ARCHIVE_AFTER_MS)
 
   if (now >= archiveAt) return 'archived'

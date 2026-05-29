@@ -15,13 +15,13 @@ export const PATCH = route(async (request, context) => {
   const payload = normalizeAchievementPayload(await readJson(request), { partial: true })
 
   if (!Object.keys(payload).length) {
-    throw badRequest('РќРµС‚ РґР°РЅРЅС‹С… РґР»СЏ РѕР±РЅРѕРІР»РµРЅРёСЏ')
+    throw badRequest('`Нет данных для обновления`')
   }
 
   try {
     const achievement = await prisma.$transaction(async (tx) => {
       const existing = await tx.achievements.findUnique({ where: { id: dbId(id) } })
-      if (!existing) throw notFound('Р”РѕСЃС‚РёР¶РµРЅРёРµ РЅРµ РЅР°Р№РґРµРЅРѕ')
+      if (!existing) throw notFound('`Достижение не найдено`')
 
       const updated = await tx.achievements.update({
         where: { id: existing.id },
@@ -42,7 +42,7 @@ export const PATCH = route(async (request, context) => {
     return json({ achievement })
   } catch (error) {
     if (error.code === 'P2002')
-      throw badRequest('Р”РѕСЃС‚РёР¶РµРЅРёРµ СЃ С‚Р°РєРёРј РєРѕРґРѕРј СѓР¶Рµ СЃСѓС‰РµСЃС‚РІСѓРµС‚')
+      throw badRequest('`Достижение с таким кодом уже существует`')
     throw error
   }
 })
@@ -55,7 +55,7 @@ export const DELETE = route(async (request, context) => {
   try {
     await prisma.achievements.delete({ where: { id: dbId(id) } })
   } catch (error) {
-    if (error.code === 'P2025') throw notFound('Р”РѕСЃС‚РёР¶РµРЅРёРµ РЅРµ РЅР°Р№РґРµРЅРѕ')
+    if (error.code === 'P2025') throw notFound('`Достижение не найдено`')
     throw error
   }
 

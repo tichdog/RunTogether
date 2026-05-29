@@ -15,8 +15,14 @@ export const DELETE = route(async (request, context) => {
 
   await prisma.$transaction(async (tx) => {
     const workout = await getWorkoutRow(tx, id)
-    if (!workout) throw notFound('РўСЂРµРЅРёСЂРѕРІРєР° РЅРµ РЅР°Р№РґРµРЅР°')
-    if (isRemovingOtherUser && !isOwnerOrAdmin(user, workout)) throw forbidden()
+
+    if (!workout) {
+      throw notFound('Тренировка не найдена')
+    }
+
+    if (isRemovingOtherUser && !isOwnerOrAdmin(user, workout)) {
+      throw forbidden()
+    }
 
     const existing = await tx.workout_participants.findFirst({
       where: {
@@ -25,7 +31,10 @@ export const DELETE = route(async (request, context) => {
         status: { in: ['pending', 'confirmed'] },
       },
     })
-    if (isRemovingOtherUser && !existing) throw notFound('РЈС‡Р°СЃС‚РЅРёРє РЅРµ РЅР°Р№РґРµРЅ')
+
+    if (isRemovingOtherUser && !existing) {
+      throw notFound('Участник не найден')
+    }
 
     if (existing) {
       await tx.workout_participants.update({
@@ -46,5 +55,6 @@ export const DELETE = route(async (request, context) => {
 
     await syncWorkoutStatus(tx, id)
   })
+
   return noContent()
 })

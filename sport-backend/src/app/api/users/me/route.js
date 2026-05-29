@@ -20,16 +20,18 @@ export const PATCH = route(async (request) => {
   const privacy = body.privacy || body.privacySettings || {}
 
   if (!NAME_RE.test(firstName)) {
-    throw badRequest(
-      'РРјСЏ РґРѕР»Р¶РЅРѕ СЃРѕРґРµСЂР¶Р°С‚СЊ С‚РѕР»СЊРєРѕ Р±СѓРєРІС‹, РѕС‚ 2 РґРѕ 15 СЃРёРјРІРѕР»РѕРІ'
-    )
+    throw badRequest('Имя должно содержать только буквы, от 2 до 15 символов')
   }
+
   if (!LAST_NAME_RE.test(lastName)) {
     throw badRequest(
-      'Р¤Р°РјРёР»РёСЏ РґРѕР»Р¶РЅР° СЃРѕРґРµСЂР¶Р°С‚СЊ Р±СѓРєРІС‹ РѕС‚ 2 РґРѕ 15 СЃРёРјРІРѕР»РѕРІ. Р”РІРѕР№РЅР°СЏ С„Р°РјРёР»РёСЏ РїРёС€РµС‚СЃСЏ С‡РµСЂРµР· РґРµС„РёСЃ'
+      'Фамилия должна содержать буквы от 2 до 15 символов. Двойная фамилия пишется через дефис'
     )
   }
-  if (!['male', 'female'].includes(gender)) throw badRequest('РќРµРєРѕСЂСЂРµРєС‚РЅС‹Р№ РїРѕР»')
+
+  if (!['male', 'female'].includes(gender)) {
+    throw badRequest('Некорректный пол')
+  }
 
   try {
     await prisma.users.update({
@@ -44,11 +46,15 @@ export const PATCH = route(async (request) => {
         updated_at: now(),
       },
     })
+
     const profile = await getUserProfile(user.id)
+
     return json({ user: publicUser(profile, { viewer: user }) })
   } catch (error) {
-    if (error.code === 'P2002')
-      throw badRequest('РўР°РєРѕР№ С‚РµР»РµС„РѕРЅ СѓР¶Рµ РёСЃРїРѕР»СЊР·СѓРµС‚СЃСЏ')
+    if (error.code === 'P2002') {
+      throw badRequest('Такой телефон уже используется')
+    }
+
     throw error
   }
 })

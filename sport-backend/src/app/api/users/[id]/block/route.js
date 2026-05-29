@@ -8,31 +8,39 @@ import { json, readJson, route } from '@/lib/server/response'
 function banUntilFromBody(body) {
   const mode = String(body.banMode || body.duration || 'permanent')
   if (mode === 'permanent') return null
+
   const days = Number(body.banDays || body.days)
   if (!Number.isFinite(days) || days <= 0) {
-    throw badRequest('РЈРєР°Р¶РёС‚Рµ СЃСЂРѕРє Р±Р°РЅР° РІ РґРЅСЏС…')
+    throw badRequest('Укажите срок бана в днях')
   }
+
   return new Date(Date.now() + days * 24 * 60 * 60 * 1000)
 }
 
 export const PATCH = route(async (request, context) => {
   const user = await requireAuth(request)
   requireAdmin(user)
+
   const { id } = await context.params
   const body = await readJson(request)
   const action = String(body.action || 'block').trim()
   const target = await getUserRole(id)
 
   if (!['block', 'unblock'].includes(action)) {
-    throw badRequest('РќРµРєРѕСЂСЂРµРєС‚РЅРѕРµ РґРµР№СЃС‚РІРёРµ РјРѕРґРµСЂР°С†РёРё')
+    throw badRequest('Некорректное действие модерации')
   }
-  if (!target) throw notFound('РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ РЅРµ РЅР°Р№РґРµРЅ')
+
+  if (!target) {
+    throw notFound('Пользователь не найден')
+  }
+
   if (Number(target.id) === Number(user.id)) {
-    throw badRequest('РќРµР»СЊР·СЏ Р·Р°Р±Р»РѕРєРёСЂРѕРІР°С‚СЊ СЃР°РјРѕРіРѕ СЃРµР±СЏ')
+    throw badRequest('Нельзя заблокировать самого себя')
   }
+
   if (isAdmin(target) && user.role !== 'super_admin') {
     throw forbidden(
-      'Р‘Р»РѕРєРёСЂРѕРІР°С‚СЊ Р°РґРјРёРЅРѕРІ РјРѕР¶РµС‚ С‚РѕР»СЊРєРѕ СЃСѓРїРµСЂ-Р°РґРјРёРЅ'
+      'Блокировать админов может только супер-админ'
     )
   }
 
@@ -48,11 +56,15 @@ export const PATCH = route(async (request, context) => {
           account_status: 'blocked',
           blocked_until: banUntilFromBody(body),
           block_reason: String(
-            body.reason || 'Р‘Р»РѕРєРёСЂРѕРІРєР° Р°РґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂРѕРј'
+            body.reason || 'Блокировка администратором'
           ).trim(),
           updated_at: now(),
         }
 
-  const updated = await prisma.users.update({ where: { id: dbId(id) }, data })
+  const updated = await prisma.users.update({
+    where: { id: dbId(id) },
+    data,
+  })
+
   return json({ user: publicUser(updated, { viewer: user }) })
 })
