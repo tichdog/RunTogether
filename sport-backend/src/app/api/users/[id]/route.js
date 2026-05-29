@@ -10,30 +10,46 @@ export const GET = route(async (request, context) => {
   const { id } = await context.params
 
   const profile = await getUserProfile(id)
-  if (!profile) throw notFound('РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ РЅРµ РЅР°Р№РґРµРЅ')
+
+  if (!profile) {
+    throw notFound('Пользователь не найден')
+  }
+
   return json({ user: publicUser(profile, { viewer: user }) })
 })
 
 export const DELETE = route(async (request, context) => {
   const user = await requireAuth(request)
   requireAdmin(user)
+
   const { id } = await context.params
   const target = await getUserRole(id)
 
-  if (!target) throw notFound('РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ РЅРµ РЅР°Р№РґРµРЅ')
+  if (!target) {
+    throw notFound('Пользователь не найден')
+  }
+
   if (Number(target.id) === Number(user.id)) {
-    throw badRequest('РђРґРјРёРЅ РЅРµ РјРѕР¶РµС‚ СѓРґР°Р»РёС‚СЊ СЃР°Рј СЃРµР±СЏ')
+    throw badRequest('Админ не может удалить сам себя')
   }
+
   if (isAdmin(target) && user.role !== 'super_admin') {
-    throw forbidden('РЈРґР°Р»СЏС‚СЊ Р°РґРјРёРЅРѕРІ РјРѕР¶РµС‚ С‚РѕР»СЊРєРѕ СЃСѓРїРµСЂ-Р°РґРјРёРЅ')
+    throw forbidden('Удалять админов может только супер-админ')
   }
+
   if (target.role === 'super_admin') {
-    const count = await prisma.users.count({ where: { role: 'super_admin' } })
+    const count = await prisma.users.count({
+      where: { role: 'super_admin' },
+    })
+
     if (count <= 1) {
-      throw badRequest('РќРµР»СЊР·СЏ СѓРґР°Р»РёС‚СЊ РїРѕСЃР»РµРґРЅРµРіРѕ СЃСѓРїРµСЂ-Р°РґРјРёРЅР°')
+      throw badRequest('Нельзя удалить последнего супер-админа')
     }
   }
 
-  await prisma.users.delete({ where: { id: dbId(id) } })
+  await prisma.users.delete({
+    where: { id: dbId(id) },
+  })
+
   return noContent()
 })

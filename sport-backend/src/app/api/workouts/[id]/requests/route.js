@@ -14,30 +14,48 @@ import {
 export const POST = route(async (request, context) => {
   const user = await requireAuth(request)
   const { id } = await context.params
+
   const participant = await prisma.$transaction(async (tx) => {
     const workout = await getWorkoutRow(tx, id)
-    if (!workout) throw notFound('РўСЂРµРЅРёСЂРѕРІРєР° РЅРµ РЅР°Р№РґРµРЅР°')
+
+    if (!workout) {
+      throw notFound('Тренировка не найдена')
+    }
+
     const synced = await syncWorkoutStatus(tx, id)
     workout.status = synced?.status || workout.status
-    if (Number(workout.organizer_id) === Number(user.id))
-      throw badRequest('РћСЂРіР°РЅРёР·Р°С‚РѕСЂ СѓР¶Рµ СѓС‡Р°СЃС‚РІСѓРµС‚ РІ С‚СЂРµРЅРёСЂРѕРІРєРµ')
-    if (!['open', 'planned'].includes(workout.status)) throw badRequest('РќР°Р±РѕСЂ Р·Р°РєСЂС‹С‚')
-    if (Number(workout.confirmed_count) >= Number(workout.participant_limit))
-      throw badRequest('РЎРІРѕР±РѕРґРЅС‹С… РјРµСЃС‚ РЅРµС‚')
+
+    if (Number(workout.organizer_id) === Number(user.id)) {
+      throw badRequest('Организатор уже участвует в тренировке')
+    }
+
+    if (!['open', 'planned'].includes(workout.status)) {
+      throw badRequest('Набор закрыт')
+    }
+
+    if (Number(workout.confirmed_count) >= Number(workout.participant_limit)) {
+      throw badRequest('Свободных мест нет')
+    }
 
     await lockParticipationForUser(tx, user.id)
 
     const currentRequest = await tx.workout_participants.findFirst({
-      where: { workout_id: dbId(id), user_id: dbId(user.id) },
+      where: {
+        workout_id: dbId(id),
+        user_id: dbId(user.id),
+      },
     })
+
     if (currentRequest?.status === 'confirmed') {
-      throw badRequest('Р’С‹ СѓР¶Рµ СѓС‡Р°СЃС‚РІСѓРµС‚Рµ РІ СЌС‚РѕР№ С‚СЂРµРЅРёСЂРѕРІРєРµ')
+      throw badRequest('Вы уже участвуете в этой тренировке')
     }
+
     if (currentRequest?.status === 'pending') {
-      throw badRequest('Р—Р°СЏРІРєР° СѓР¶Рµ РЅР° СЂР°СЃСЃРјРѕС‚СЂРµРЅРёРё')
+      throw badRequest('Заявка уже на рассмотрении')
     }
 
     const conflict = await findParticipationConflict(tx, user.id, workout)
+
     if (conflict) {
       throw badRequest(participationConflictMessage(conflict))
     }
@@ -45,10 +63,18 @@ export const POST = route(async (request, context) => {
     const row = currentRequest
       ? await tx.workout_participants.update({
           where: { id: currentRequest.id },
-          data: { status: 'pending', requested_at: now(), responded_at: null },
+          data: {
+            status: 'pending',
+            requested_at: now(),
+            responded_at: null,
+          },
         })
       : await tx.workout_participants.create({
-          data: { workout_id: dbId(id), user_id: dbId(user.id), status: 'pending' },
+          data: {
+            workout_id: dbId(id),
+            user_id: dbId(user.id),
+            status: 'pending',
+          },
         })
 
     await createNotification(tx, {
@@ -56,25 +82,48 @@ export const POST = route(async (request, context) => {
       type: 'participation_request',
       title: 'Новая заявка на тренировку',
       message: workout.title,
-      payload: { workoutId: workout.id, requestId: row.id, userId: user.id },
+      payload: {
+        workoutId: workout.id,
+        requestId: row.id,
+        userId: user.id,
+      },
     })
+
     return row
   })
+
   return json({ request: participant }, 201)
 })
 
 export const GET = route(async (request, context) => {
   const user = await requireAuth(request)
   const { id } = await context.params
-  const workout = await prisma.workouts.findUnique({ where: { id: dbId(id) } })
-  if (!workout) throw notFound('РўСЂРµРЅРёСЂРѕРІРєР° РЅРµ РЅР°Р№РґРµРЅР°')
-  if (!isOwnerOrAdmin(user, workout)) throw forbidden()
+
+  const workout = await prisma.workouts.findUnique({
+    where: { id: dbId(id) },
+  })
+
+  if (!workout) {
+    throw notFound('Тренировка не найдена')
+  }
+
+  if (!isOwnerOrAdmin(user, workout)) {
+    throw forbidden()
+  }
 
   const rows = await prisma.workout_participants.findMany({
     where: { workout_id: dbId(id) },
     orderBy: { requested_at: 'desc' },
-    include: { users: { select: { full_name: true, email: true } } },
+    include: {
+      users: {
+        select: {
+          full_name: true,
+          email: true,
+        },
+      },
+    },
   })
+
   return json({
     requests: rows.map((row) => ({
       ...row,

@@ -20,13 +20,20 @@ import {
 export const GET = route(async (request, context) => {
   const user = await requireAuth(request)
   const { id } = await context.params
+
   await syncWorkoutStatus(prisma, id)
+
   const workout = await prisma.workouts.findUnique({
     where: { id: dbId(id) },
     include: workoutInclude,
   })
-  if (!workout) throw notFound('РўСЂРµРЅРёСЂРѕРІРєР° РЅРµ РЅР°Р№РґРµРЅР°')
+
+  if (!workout) {
+    throw notFound('Тренировка не найдена')
+  }
+
   const [row] = await buildWorkoutRows([workout], user)
+
   return json({ workout: workoutPayload(row, user) })
 })
 
@@ -35,20 +42,26 @@ export const PATCH = route(async (request, context) => {
   const { id } = await context.params
   const data = parseWorkoutBody(await readJson(request))
   const settings = await getSettings()
+
   validateWorkoutStart(data.startAt, settings)
+
   const updated = await prisma.$transaction(async (tx) => {
     const workout = await getWorkoutRow(tx, id)
-    if (!workout) throw notFound('РўСЂРµРЅРёСЂРѕРІРєР° РЅРµ РЅР°Р№РґРµРЅР°')
-    if (!isOwnerOrAdmin(user, workout)) throw forbidden()
-    if (new Date(workout.start_at) <= new Date()) {
-      throw badRequest(
-        'РўСЂРµРЅРёСЂРѕРІРєСѓ РјРѕР¶РЅРѕ СЂРµРґР°РєС‚РёСЂРѕРІР°С‚СЊ С‚РѕР»СЊРєРѕ РґРѕ РЅР°С‡Р°Р»Р°'
-      )
+
+    if (!workout) {
+      throw notFound('Тренировка не найдена')
     }
+
+    if (!isOwnerOrAdmin(user, workout)) {
+      throw forbidden()
+    }
+
+    if (new Date(workout.start_at) <= new Date()) {
+      throw badRequest('Тренировку можно редактировать только до начала')
+    }
+
     if (workout.status === 'cancelled') {
-      throw badRequest(
-        'РћС‚РјРµРЅРµРЅРЅСѓСЋ С‚СЂРµРЅРёСЂРѕРІРєСѓ РЅРµР»СЊР·СЏ СЂРµРґР°РєС‚РёСЂРѕРІР°С‚СЊ'
-      )
+      throw badRequest('Отмененную тренировку нельзя редактировать')
     }
 
     const row = await tx.workouts.update({
@@ -78,9 +91,11 @@ export const PATCH = route(async (request, context) => {
       title: 'Тренировка изменена',
       message: data.title,
     })
+
     return row
   })
 
   const [row] = await buildWorkoutRows([updated], user)
+
   return json({ workout: workoutPayload(row, user) })
 })

@@ -12,10 +12,12 @@ export const POST = route(async (request, context) => {
   const body = await readJson(request)
   const cancelled = await prisma.$transaction(async (tx) => {
     const workout = await getWorkoutRow(tx, id)
-    if (!workout) throw notFound('РўСЂРµРЅРёСЂРѕРІРєР° РЅРµ РЅР°Р№РґРµРЅР°')
+    if (!workout) throw notFound('Тренировка не найдена')
     if (!isOwnerOrAdmin(user, workout)) throw forbidden()
-    if (['completed', 'archived'].includes(workout.status))
-      throw badRequest('Р—Р°РІРµСЂС€РµРЅРЅСѓСЋ С‚СЂРµРЅРёСЂРѕРІРєСѓ РЅРµР»СЊР·СЏ РѕС‚РјРµРЅРёС‚СЊ')
+
+    if (['completed', 'archived'].includes(workout.status)) {
+      throw badRequest('Завершенную тренировку нельзя отменить')
+    }
 
     const row = await tx.workouts.update({
       where: { id: dbId(id) },

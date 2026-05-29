@@ -13,17 +13,19 @@ export const POST = route(async (request, context) => {
   const target = await getUserRole(id)
 
   if (!target)
-    throw notFound(
-      'Р СџР С•Р В»РЎРЉР В·Р С•Р Р†Р В°РЎвЂљР ВµР В»РЎРЉ Р Р…Р Вµ Р Р…Р В°Р в„–Р Т‘Р ВµР Р…'
-    )
+  throw notFound(
+    'Пользователь не найден'
+  )
+
   if (Number(target.id) !== Number(user.id) && isAdmin(target) && user.role !== 'super_admin') {
     throw forbidden(
-      'Р С’Р Р†Р В°РЎвЂљР В°РЎР‚РЎвЂ№ Р В°Р Т‘Р СР С‘Р Р…Р С•Р Р† Р СР С•Р В¶Р ВµРЎвЂљ Р СР ВµР Р…РЎРЏРЎвЂљРЎРЉ РЎвЂљР С•Р В»РЎРЉР С”Р С• РЎРѓРЎС“Р С—Р ВµРЎР‚-Р В°Р Т‘Р СР С‘Р Р…'
+      'Аватар админов может менять только супер-админ'
     )
   }
 
   const form = await request.formData()
   const avatarUrl = await saveImageUpload(form.get('avatar'))
+
   const updated = await prisma.users.update({
     where: { id: dbId(id) },
     data: { avatar_url: avatarUrl, updated_at: now() },
@@ -31,7 +33,7 @@ export const POST = route(async (request, context) => {
 
   if (!updated)
     throw badRequest(
-      'Р С’Р Р†Р В°РЎвЂљР В°РЎР‚ Р Р…Р Вµ РЎС“Р Т‘Р В°Р В»Р С•РЎРѓРЎРЉ РЎРѓР С•РЎвЂ¦РЎР‚Р В°Р Р…Р С‘РЎвЂљРЎРЉ'
+      'Аватар не удалось сохранить'
     )
 
   const profile = await getUserProfile(id)

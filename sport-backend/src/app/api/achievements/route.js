@@ -41,7 +41,7 @@ export const POST = route(async (request) => {
     return json({ achievement: { ...achievement, earned_count: 0 } }, 201)
   } catch (error) {
     if (error.code === 'P2002')
-      throw badRequest('Р”РѕСЃС‚РёР¶РµРЅРёРµ СЃ С‚Р°РєРёРј РєРѕРґРѕРј СѓР¶Рµ СЃСѓС‰РµСЃС‚РІСѓРµС‚')
+      throw badRequest('`Достижение с таким кодом уже существует`')
     throw error
   }
 })
