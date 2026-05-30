@@ -1,15 +1,16 @@
 import { requireAuth } from '@/lib/server/auth'
+import { INPUT_LIMITS } from '@/lib/input-limits'
 import { dbId, prisma } from '@/lib/server/db'
 import { badRequest, forbidden } from '@/lib/server/http-error'
 import { publicUser } from '@/lib/mappers/user'
 import { json, readJson, route } from '@/lib/server/response'
+import { cleanLimitedText } from '@/lib/server/validation'
 import { attachUserProfiles } from '@/lib/repositories/users'
 import { evaluateAchievements } from '@/lib/services/achievements'
 import { createNotification } from '@/lib/services/notifications'
 import { getSettings } from '@/lib/services/settings'
 import { syncWorkoutStatus } from '@/lib/services/workouts'
 
-const REVIEW_TEXT_MAX_LENGTH = 1000
 const DAY_MS = 24 * 60 * 60 * 1000
 
 function isWorkoutMember(workout, userId) {
@@ -37,9 +38,7 @@ function canReviewWorkout(workout, settings, now = new Date()) {
 }
 
 function cleanReviewText(value) {
-  return String(value || '')
-    .trim()
-    .slice(0, REVIEW_TEXT_MAX_LENGTH)
+  return cleanLimitedText(value, 'Текст отзыва', { max: INPUT_LIMITS.reviewText })
 }
 
 export const GET = route(async (request, context) => {

@@ -1,9 +1,11 @@
 import { requireAdmin, requireAuth, isAdmin } from '@/lib/server/auth'
+import { INPUT_LIMITS } from '@/lib/input-limits'
 import { dbId, now, prisma } from '@/lib/server/db'
 import { badRequest, forbidden, notFound } from '@/lib/server/http-error'
 import { publicUser } from '@/lib/mappers/user'
 import { getUserRole } from '@/lib/repositories/users'
 import { json, readJson, route } from '@/lib/server/response'
+import { cleanLimitedText } from '@/lib/server/validation'
 
 function banUntilFromBody(body) {
   const mode = String(body.banMode || body.duration || 'permanent')
@@ -24,6 +26,13 @@ export const PATCH = route(async (request, context) => {
   const { id } = await context.params
   const body = await readJson(request)
   const action = String(body.action || 'block').trim()
+  const blockReason =
+    action === 'block'
+      ? cleanLimitedText(body.reason || 'Блокировка администратором', 'Причина блокировки', {
+          max: INPUT_LIMITS.userBlockReason,
+          required: true,
+        })
+      : null
   const target = await getUserRole(id)
 
   if (!['block', 'unblock'].includes(action)) {
@@ -53,7 +62,7 @@ export const PATCH = route(async (request, context) => {
       : {
           account_status: 'blocked',
           blocked_until: banUntilFromBody(body),
-          block_reason: String(body.reason || 'Блокировка администратором').trim(),
+          block_reason: blockReason,
           updated_at: now(),
         }
 

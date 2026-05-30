@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { api } from '../api/client'
 import { Btn, Select } from './ui'
+import { INPUT_LIMITS } from '@/lib/input-limits'
 import { T } from '../tokens'
 
 const REASONS = [
@@ -89,7 +90,16 @@ export function ReportUserButton({
             <h2 style={{ margin: '0 0 4px', fontSize: 20, color: T.text }}>
               Жалоба на пользователя
             </h2>
-            <p style={{ margin: '0 0 16px', color: T.textMuted, fontSize: 13 }}>{user.name}</p>
+            <p
+              style={{
+                margin: '0 0 16px',
+                color: T.textMuted,
+                fontSize: 13,
+                overflowWrap: 'anywhere',
+              }}
+            >
+              {user.name}
+            </p>
 
             <label style={fieldStyle}>
               <span style={labelStyle}>Причина</span>
@@ -112,6 +122,7 @@ export function ReportUserButton({
                 value={details}
                 onChange={(event) => setDetails(event.target.value)}
                 placeholder="Что произошло?"
+                maxLength={INPUT_LIMITS.reportDetails}
                 rows={5}
                 style={textareaStyle}
               />

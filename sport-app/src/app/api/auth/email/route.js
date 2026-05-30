@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/server/db'
+import { INPUT_LIMITS } from '@/lib/input-limits'
 import { badRequest } from '@/lib/server/http-error'
 import { json, route } from '@/lib/server/response'
 
@@ -12,7 +13,7 @@ export const GET = route(async (request) => {
   const { searchParams } = new URL(request.url)
   const email = normalizeEmail(searchParams.get('email'))
 
-  if (!email || !EMAIL_RE.test(email)) {
+  if (!email || email.length > INPUT_LIMITS.email || !EMAIL_RE.test(email)) {
     throw badRequest('Некорректный email')
   }
 

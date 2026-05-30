@@ -1,4 +1,5 @@
 import bcrypt from 'bcryptjs'
+import { INPUT_LIMITS } from '@/lib/input-limits'
 import { prisma } from '@/lib/server/db'
 import { HttpError, badRequest } from '@/lib/server/http-error'
 import { createAuthSession, refreshExpiredBlock, setAuthCookies } from '@/lib/server/auth'
@@ -20,6 +21,9 @@ export const POST = route(async (request) => {
   const login = rawLogin.toLowerCase()
   const password = String(body.password || '')
   if (!login || !password) throw badRequest('Укажите логин и пароль')
+  if (login.length > INPUT_LIMITS.login || password.length > INPUT_LIMITS.password) {
+    throw badRequest('Некорректный логин или пароль')
+  }
   if (/[A-Za-z@]/.test(login) && !EMAIL_RE.test(login)) {
     throw badRequest('Некорректный email')
   }

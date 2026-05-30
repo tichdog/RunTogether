@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { api } from '../api/client'
+import { INPUT_LIMITS } from '@/lib/input-limits'
 import {
   Badge,
   Btn,
@@ -197,16 +198,19 @@ function ReportCard({ report, decision, saving, onDecision, onModerate, onSelect
   const isOpen = report.status === 'open'
 
   return (
-    <Card>
+    <Card style={{ overflow: 'hidden' }}>
       <div
+        className="report-card-grid"
         style={{
           display: 'grid',
-          gridTemplateColumns: 'minmax(0, 1fr) auto',
+          gridTemplateColumns: isOpen
+            ? 'minmax(0, 1fr) minmax(260px, 300px)'
+            : 'minmax(0, 1fr)',
           gap: 16,
           alignItems: 'start',
         }}
       >
-        <div>
+        <div style={{ minWidth: 0 }}>
           <div
             style={{
               display: 'flex',
@@ -226,13 +230,27 @@ function ReportCard({ report, decision, saving, onDecision, onModerate, onSelect
               </span>
             )}
           </div>
-          <h2 style={{ margin: '0 0 8px', color: T.text, fontSize: 18 }}>{report.reason}</h2>
+          <h2
+            style={{ margin: '0 0 8px', color: T.text, fontSize: 18, overflowWrap: 'anywhere' }}
+          >
+            {report.reason}
+          </h2>
           {report.details && (
-            <p style={{ margin: '0 0 14px', color: T.textMuted, fontSize: 13, lineHeight: 1.5 }}>
+            <p
+              style={{
+                margin: '0 0 14px',
+                color: T.textMuted,
+                fontSize: 13,
+                lineHeight: 1.5,
+                overflowWrap: 'anywhere',
+                whiteSpace: 'pre-wrap',
+              }}
+            >
               {report.details}
             </p>
           )}
           <div
+            className="report-person-grid"
             style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12 }}
           >
             <PersonBlock
@@ -248,7 +266,14 @@ function ReportCard({ report, decision, saving, onDecision, onModerate, onSelect
             />
           </div>
           {!isOpen && (
-            <div style={{ marginTop: 14, color: T.textMuted, fontSize: 13 }}>
+            <div
+              style={{
+                marginTop: 14,
+                color: T.textMuted,
+                fontSize: 13,
+                overflowWrap: 'anywhere',
+              }}
+            >
               Решение: {status.text}
               {report.moderator?.name ? ` · ${report.moderator.name}` : ''}
               {report.moderatorComment ? ` · ${report.moderatorComment}` : ''}
@@ -258,7 +283,7 @@ function ReportCard({ report, decision, saving, onDecision, onModerate, onSelect
         </div>
 
         {isOpen && (
-          <div style={{ width: 300, display: 'grid', gap: 10 }}>
+          <div className="report-decision-panel" style={{ width: '100%', display: 'grid', gap: 10 }}>
             <SectionTitle>Решение</SectionTitle>
             <Select
               value={decision.action}
@@ -283,6 +308,8 @@ function ReportCard({ report, decision, saving, onDecision, onModerate, onSelect
                   value={decision.banDays}
                   onChange={(event) => onDecision({ banDays: event.target.value })}
                   disabled={decision.banMode === 'permanent'}
+                  min={1}
+                  max={3650}
                 />
               </div>
             )}
@@ -290,6 +317,7 @@ function ReportCard({ report, decision, saving, onDecision, onModerate, onSelect
               value={decision.moderatorComment}
               onChange={(event) => onDecision({ moderatorComment: event.target.value })}
               placeholder="Комментарий модератора"
+              maxLength={INPUT_LIMITS.moderatorComment}
               rows={4}
               style={textareaStyle}
             />
@@ -334,6 +362,9 @@ function PersonBlock({ title, person, onSelectUser, target }) {
           cursor: 'pointer',
           fontSize: 14,
           fontWeight: 800,
+          maxWidth: '100%',
+          overflowWrap: 'anywhere',
+          textAlign: 'left',
         }}
       >
         {person.name || person.email || `ID ${person.id}`}

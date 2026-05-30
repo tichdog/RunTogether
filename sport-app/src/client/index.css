@@ -150,6 +150,35 @@ img {
   background: rgba(0, 0, 0, 0.03);
 }
 
+.report-card-grid,
+.report-card-grid > *,
+.report-person-grid,
+.report-person-grid > *,
+.report-decision-panel,
+.admin-workout-header > *,
+.admin-workout-row > *,
+.user-detail-grid,
+.user-detail-grid > * {
+  min-width: 0;
+}
+
+.admin-workout-row span,
+.admin-workout-row div,
+.user-detail-page span,
+.user-detail-page strong {
+  overflow-wrap: anywhere;
+}
+
+.admin-workout-header > * {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-workout-form > * {
+  min-width: 0;
+}
+
 @media (max-width: 900px) {
   .desktop-navbar {
     display: none !important;
@@ -176,6 +205,16 @@ img {
 
   .users-list-header {
     display: none !important;
+  }
+
+  .report-card-grid,
+  .report-person-grid,
+  .user-detail-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .report-decision-panel {
+    width: 100% !important;
   }
 
   .user-row {
@@ -236,6 +275,32 @@ img {
     color: #9e9b93;
     font-weight: 700;
   }
+
+  .admin-workout-header {
+    display: none !important;
+  }
+
+  .admin-workout-form {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .admin-workout-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    align-items: start !important;
+  }
+
+  .admin-workout-row > :nth-child(3),
+  .admin-workout-row > :nth-child(7) {
+    grid-column: 1 / -1;
+  }
+
+  .admin-workout-row > :nth-child(6) {
+    justify-self: flex-start;
+  }
+
+  .admin-workout-row > :nth-child(7) {
+    justify-content: flex-start !important;
+  }
 }
 
 @media (max-width: 720px) {
@@ -249,5 +314,13 @@ img {
 
   .user-detail-page {
     padding: 18px 14px !important;
+  }
+
+  .admin-workout-row {
+    grid-template-columns: 1fr !important;
+  }
+
+  .admin-workout-form {
+    grid-template-columns: 1fr !important;
   }
 }

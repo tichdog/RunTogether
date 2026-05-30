@@ -159,6 +159,7 @@ export function Input({
   min,
   max,
   step,
+  ...props
 }) {
   return (
     <input
@@ -171,6 +172,7 @@ export function Input({
       min={min}
       max={max}
       step={step}
+      {...props}
       style={{
         background: T.surface,
         border: `1px solid ${T.border}`,

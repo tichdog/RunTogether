@@ -1,3 +1,4 @@
+import { INPUT_LIMITS } from '../input-limits'
 import { badRequest } from '../server/http-error'
 
 export const ACHIEVEMENT_CONDITIONS = new Set([
@@ -20,7 +21,7 @@ function makeCode(title) {
     .normalize('NFKD')
     .replace(/[^\p{Letter}\p{Number}]+/gu, '_')
     .replace(/^_+|_+$/g, '')
-    .slice(0, 48)
+    .slice(0, INPUT_LIMITS.achievementCode)
 
   return code || `achievement_${Date.now()}`
 }
@@ -29,15 +30,24 @@ export function normalizeAchievementPayload(body, { partial = false } = {}) {
   const payload = {}
 
   if (!partial || 'title' in body) {
-    payload.title = cleanText(body.title, 'Название', { max: 120, required: !partial })
+    payload.title = cleanText(body.title, 'Название', {
+      max: INPUT_LIMITS.achievementTitle,
+      required: !partial,
+    })
   }
 
   if (!partial || 'description' in body) {
-    payload.description = cleanText(body.description, 'Описание', { max: 500, required: !partial })
+    payload.description = cleanText(body.description, 'Описание', {
+      max: INPUT_LIMITS.achievementDescription,
+      required: !partial,
+    })
   }
 
   if (!partial || 'icon' in body) {
-    payload.icon = cleanText(body.icon, 'Значок', { max: 40, required: !partial })
+    payload.icon = cleanText(body.icon, 'Значок', {
+      max: INPUT_LIMITS.achievementIcon,
+      required: !partial,
+    })
   }
 
   if (!partial || 'condition' in body || 'conditionType' in body || 'conditionValue' in body) {
@@ -49,8 +59,12 @@ export function normalizeAchievementPayload(body, { partial = false } = {}) {
       throw badRequest('Выберите корректное условие достижения')
     }
 
-    if (!Number.isFinite(value) || value <= 0) {
-      throw badRequest('Значение условия должно быть положительным числом')
+    if (
+      !Number.isFinite(value) ||
+      value <= 0 ||
+      value > INPUT_LIMITS.achievementConditionValue
+    ) {
+      throw badRequest(`Значение условия должно быть числом от 1 до ${INPUT_LIMITS.achievementConditionValue}`)
     }
 
     payload.condition = { type, value }
@@ -59,7 +73,7 @@ export function normalizeAchievementPayload(body, { partial = false } = {}) {
   if (!partial || 'code' in body) {
     const fallback = payload.title || body.title || ''
     payload.code = cleanText(body.code || makeCode(fallback), 'Код', {
-      max: 64,
+      max: INPUT_LIMITS.achievementCode,
       required: !partial,
     })
       .toLowerCase()

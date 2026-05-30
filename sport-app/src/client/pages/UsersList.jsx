@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { api } from '../api/client'
 import { Avatar, Badge, Card, EmptyState, Input, Select, StatusBadge } from '../components/ui'
 import { ReportUserButton } from '../components/ReportUserButton'
+import { INPUT_LIMITS } from '@/lib/input-limits'
 import { ROLE_COLORS, ROLE_LABELS, STATUS_LABELS, T } from '../tokens'
 
 export function UsersList({ onSelect, currentUserId }) {
@@ -56,6 +57,7 @@ export function UsersList({ onSelect, currentUserId }) {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Поиск по имени"
+          maxLength={INPUT_LIMITS.search}
           style={{ flex: 1 }}
         />
         <Select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)}>

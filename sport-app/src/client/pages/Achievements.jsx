@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { api } from '../api/client'
 import { Btn, Card, Input, SectionTitle, Select } from '../components/ui'
+import { INPUT_LIMITS } from '@/lib/input-limits'
 import { T } from '../tokens'
 
 const CONDITION_LABELS = {
@@ -156,10 +157,19 @@ export function Achievements() {
                 <div style={iconBox}>{achievement.icon}</div>
                 <div style={{ minWidth: 0, flex: 1 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                    <strong style={{ color: T.text }}>{achievement.title}</strong>
+                    <strong style={{ color: T.text, overflowWrap: 'anywhere' }}>
+                      {achievement.title}
+                    </strong>
                     <code style={codePill}>{achievement.code}</code>
                   </div>
-                  <div style={{ marginTop: 4, color: T.textMuted, fontSize: 13 }}>
+                  <div
+                    style={{
+                      marginTop: 4,
+                      color: T.textMuted,
+                      fontSize: 13,
+                      overflowWrap: 'anywhere',
+                    }}
+                  >
                     {achievement.description}
                   </div>
                   <div style={{ marginTop: 8, color: T.textHint, fontSize: 12, fontWeight: 700 }}>
@@ -187,13 +197,19 @@ export function Achievements() {
           <form onSubmit={save} style={{ display: 'grid', gap: 12 }}>
             <label style={fieldStyle}>
               <span>Название</span>
-              <Input value={form.title} onChange={set('title')} required />
+              <Input
+                value={form.title}
+                onChange={set('title')}
+                maxLength={INPUT_LIMITS.achievementTitle}
+                required
+              />
             </label>
             <label style={fieldStyle}>
               <span>Описание</span>
               <textarea
                 value={form.description}
                 onChange={set('description')}
+                maxLength={INPUT_LIMITS.achievementDescription}
                 required
                 rows={4}
                 style={textareaStyle}
@@ -201,7 +217,12 @@ export function Achievements() {
             </label>
             <label style={fieldStyle}>
               <span>Код</span>
-              <Input value={form.code} onChange={set('code')} placeholder="first_finish" />
+              <Input
+                value={form.code}
+                onChange={set('code')}
+                placeholder="first_finish"
+                maxLength={INPUT_LIMITS.achievementCode}
+              />
             </label>
             <label style={fieldStyle}>
               <span>Значок</span>
@@ -213,7 +234,11 @@ export function Achievements() {
                     </option>
                   ))}
                 </Select>
-                <Input value={form.icon} onChange={set('icon')} />
+                <Input
+                  value={form.icon}
+                  onChange={set('icon')}
+                  maxLength={INPUT_LIMITS.achievementIcon}
+                />
               </div>
             </label>
             <label style={fieldStyle}>
@@ -231,6 +256,7 @@ export function Achievements() {
               <input
                 type="number"
                 min="1"
+                max={INPUT_LIMITS.achievementConditionValue}
                 step={form.conditionType === 'distance_km' ? '0.1' : '1'}
                 value={form.conditionValue}
                 onChange={set('conditionValue')}
