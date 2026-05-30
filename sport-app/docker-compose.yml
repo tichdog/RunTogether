@@ -1,0 +1,66 @@
+﻿services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: sport-postgres
+    profiles:
+      - database
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: sport_training
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - '5433:5432'
+    volumes:
+      - sport_postgres_data:/var/lib/postgresql/data
+      - ./src/db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./src/db/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro
+
+  loki:
+    image: grafana/loki:latest
+    container_name: sport-loki
+    restart: unless-stopped
+    command: -config.file=/etc/loki/config.yml
+    ports:
+      - '3100:3100'
+    volumes:
+      - ./observability/loki/config.yml:/etc/loki/config.yml:ro
+      - sport_loki_data:/loki
+
+  promtail:
+    image: grafana/promtail:latest
+    container_name: sport-promtail
+    restart: unless-stopped
+    command: -config.file=/etc/promtail/config.yml
+    depends_on:
+      - loki
+    volumes:
+      - ./observability/promtail/config.yml:/etc/promtail/config.yml:ro
+      - ./logs:/var/log/sport-app:ro
+
+  grafana:
+    image: grafana/grafana-oss:11.6.0
+    container_name: sport-grafana
+    restart: unless-stopped
+    depends_on:
+      - loki
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_DEFAULT_THEME: light
+      GF_ANALYTICS_REPORTING_ENABLED: 'false'
+      GF_ANALYTICS_CHECK_FOR_UPDATES: 'false'
+      GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES: 'false'
+      GF_PLUGINS_PREINSTALL_DISABLED: 'true'
+      GF_PLUGINS_DISABLE_PLUGINS: grafana-lokiexplore-app,grafana-pyroscope-app,grafana-exploretraces-app,grafana-metricsdrilldown-app
+    ports:
+      - '3001:3000'
+    volumes:
+      - sport_grafana_data:/var/lib/grafana
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+
+volumes:
+  sport_postgres_data:
+  sport_loki_data:
+  sport_grafana_data:

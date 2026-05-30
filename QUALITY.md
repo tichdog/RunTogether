@@ -1,28 +1,19 @@
-# Инструменты качества кода
+﻿# Инструменты качества кода
 
 В проекте используются ESLint для статического анализа и Prettier для форматирования.
 
-## Frontend
+## Единое Next.js-приложение
 
 ```powershell
-cd sport-frontend
+cd sport-app
 npm run lint
 npm run lint:fix
 npm run format:check
 npm run format
+npm run build
 ```
 
-## Backend
-
-```powershell
-cd sport-backend
-npm run lint
-npm run lint:fix
-npm run format:check
-npm run format
-```
-
-ESLint проверяет правила качества для React, React Hooks, Vite и Next.js.
+ESLint проверяет правила качества для React, React Hooks и Next.js.
 Prettier отвечает за форматирование, а `eslint-config-prettier` отключает
 правила ESLint, которые могли бы конфликтовать с Prettier.
 
