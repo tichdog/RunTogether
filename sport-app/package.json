@@ -4,8 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "next dev -p 4000",
-    "dev:logs": "next dev -p 4000 | pino-pretty --translateTime SYS:standard --ignore pid,hostname",
+    "dev": "next dev --webpack -p 4000",
+    "dev:logs": "next dev --webpack -p 4000 | pino-pretty --translateTime SYS:standard --ignore pid,hostname",
     "postinstall": "prisma generate",
     "db:up": "docker compose --profile database up -d postgres",
     "db:down": "docker compose stop postgres",
