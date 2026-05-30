@@ -1,6 +1,8 @@
 import { badRequest } from '../server/http-error'
 import { isAdmin } from '../server/auth'
+import { INPUT_LIMITS } from '../input-limits'
 import { dbId, prisma } from '../server/db'
+import { cleanLimitedText } from '../server/validation'
 import { workoutInclude, buildWorkoutRows } from '../services/workouts'
 
 const WORKOUT_LIMITS = {
@@ -15,10 +17,27 @@ export function isOwnerOrAdmin(user, workout) {
 }
 
 export function parseWorkoutBody(body) {
-  const title = String(body.title || '').trim()
+  const title = cleanLimitedText(body.title, 'Название тренировки', {
+    max: INPUT_LIMITS.workoutTitle,
+    required: true,
+  })
   const startAt = body.startAt || body.start_at
   const meetingPoint = body.meetingPoint || {}
   const route = body.route || {}
+  const meetingPointName = cleanLimitedText(meetingPoint.name, 'Точка сбора', {
+    max: INPUT_LIMITS.workoutMeetingName,
+    required: true,
+  })
+  const meetingPointAddress = cleanLimitedText(meetingPoint.address, 'Адрес сбора', {
+    max: INPUT_LIMITS.workoutMeetingAddress,
+  })
+  const routeName = cleanLimitedText(route.name, 'Маршрут', {
+    max: INPUT_LIMITS.workoutRouteName,
+    required: true,
+  })
+  const description = cleanLimitedText(body.description, 'Комментарий к тренировке', {
+    max: INPUT_LIMITS.workoutDescription,
+  })
   const difficulty = body.difficulty
   const durationMinutes = Number(body.durationMinutes ?? body.duration_minutes ?? 60)
   const participantLimit = Number(body.participantLimit ?? body.participant_limit)
@@ -26,10 +45,7 @@ export function parseWorkoutBody(body) {
   const paceMinPerKm = Number(body.paceMinPerKm ?? body.pace_min_per_km)
 
   if (
-    !title ||
     !startAt ||
-    !meetingPoint.name ||
-    !route.name ||
     !participantLimit ||
     !distanceKm ||
     !paceMinPerKm
@@ -48,11 +64,11 @@ export function parseWorkoutBody(body) {
 
   return {
     title,
-    description: body.description || null,
+    description: description || null,
     startAt,
     durationMinutes,
-    meetingPoint,
-    route,
+    meetingPoint: { ...meetingPoint, name: meetingPointName, address: meetingPointAddress },
+    route: { ...route, name: routeName },
     distanceKm,
     paceMinPerKm,
     difficulty,

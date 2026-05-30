@@ -34,8 +34,24 @@ function corsHeaders(request) {
   return headers
 }
 
+function uploadSecurityHeaders(headers) {
+  headers.set('X-Content-Type-Options', 'nosniff')
+  headers.set('Content-Security-Policy', "default-src 'none'; img-src 'self' data:; sandbox")
+  return headers
+}
+
 export function middleware(request) {
   const headers = corsHeaders(request)
+  const pathname = request.nextUrl?.pathname || new URL(request.url).pathname
+  const isUpload = pathname.startsWith('/uploads/')
+
+  if (isUpload) {
+    uploadSecurityHeaders(headers)
+
+    if (pathname.toLowerCase().endsWith('.svg')) {
+      return new NextResponse(null, { status: 404, headers })
+    }
+  }
 
   if (request.method === 'OPTIONS') {
     return new NextResponse(null, { status: 204, headers })

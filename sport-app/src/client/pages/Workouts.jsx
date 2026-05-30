@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { api } from '../api/client'
 import { Avatar, Btn, Card, EmptyState, Input, Select, StatusBadge } from '../components/ui'
 import { ReportUserButton } from '../components/ReportUserButton'
+import { INPUT_LIMITS } from '@/lib/input-limits'
 import { T } from '../tokens'
 
 function initialForm(participantLimit = 20) {
@@ -289,33 +290,46 @@ export function Workouts({ selectedWorkoutId, onSelectWorkout, onBackToList, cur
       {showForm && (
         <Card style={{ marginBottom: 18 }}>
           <form
+            className="admin-workout-form"
             onSubmit={create}
             style={{ display: 'grid', gridTemplateColumns: '1.2fr 180px 1fr 1fr', gap: 10 }}
           >
-            <Input value={form.title} onChange={set('title')} placeholder="Название" required />
+            <Input
+              value={form.title}
+              onChange={set('title')}
+              placeholder="Название"
+              maxLength={INPUT_LIMITS.workoutTitle}
+              required
+            />
             <Input value={form.startAt} onChange={set('startAt')} type="datetime-local" required />
             <Input
               value={form.meetingName}
               onChange={set('meetingName')}
               placeholder="Точка сбора"
+              maxLength={INPUT_LIMITS.workoutMeetingName}
               required
             />
             <Input
               value={form.routeName}
               onChange={set('routeName')}
               placeholder="Маршрут"
+              maxLength={INPUT_LIMITS.workoutRouteName}
               required
             />
             <Input
               value={form.meetingAddress}
               onChange={set('meetingAddress')}
               placeholder="Адрес"
+              maxLength={INPUT_LIMITS.workoutMeetingAddress}
             />
             <Input
               value={form.distanceKm}
               onChange={set('distanceKm')}
               type="number"
               placeholder="Км"
+              min={0.1}
+              max={99999.99}
+              step={0.01}
               required
             />
             <Input
@@ -323,6 +337,9 @@ export function Workouts({ selectedWorkoutId, onSelectWorkout, onBackToList, cur
               onChange={set('paceMinPerKm')}
               type="number"
               placeholder="Темп"
+              min={0.1}
+              max={99.99}
+              step={0.01}
               required
             />
             <Select value={form.difficulty} onChange={set('difficulty')}>
@@ -335,6 +352,8 @@ export function Workouts({ selectedWorkoutId, onSelectWorkout, onBackToList, cur
               onChange={set('participantLimit')}
               type="number"
               placeholder="Лимит"
+              min={1}
+              max={200}
               required
             />
             <Btn type="submit" variant="primary">
@@ -349,6 +368,7 @@ export function Workouts({ selectedWorkoutId, onSelectWorkout, onBackToList, cur
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Поиск по названию или организатору"
+          maxLength={INPUT_LIMITS.search}
           style={{ flex: 1 }}
         />
         <Select value={difficulty} onChange={(e) => setDifficulty(e.target.value)}>
@@ -383,18 +403,22 @@ export function Workouts({ selectedWorkoutId, onSelectWorkout, onBackToList, cur
       )}
 
       <Card style={{ padding: 0, overflow: 'hidden' }}>
-        <div style={headerGrid}>
+        <div className="admin-workout-header" style={headerGrid}>
           {['№', 'Организатор', 'Тренировка', 'Дата', 'Места', 'Статус', ''].map((h) => (
             <div key={h}>{h}</div>
           ))}
         </div>
 
         {filtered.map((workout, index) => (
-          <div key={workout.id} style={rowGrid(index, filtered.length)}>
+          <div key={workout.id} className="admin-workout-row" style={rowGrid(index, filtered.length)}>
             <span style={{ fontSize: 12, color: T.textHint, fontWeight: 700 }}>{workout.id}</span>
-            <span style={{ fontSize: 13, fontWeight: 700 }}>{workout.organizerName}</span>
+            <span style={{ fontSize: 13, fontWeight: 700, overflowWrap: 'anywhere' }}>
+              {workout.organizerName}
+            </span>
             <div>
-              <div style={{ fontSize: 13, color: T.text, fontWeight: 700 }}>{workout.title}</div>
+              <div style={{ fontSize: 13, color: T.text, fontWeight: 700, overflowWrap: 'anywhere' }}>
+                {workout.title}
+              </div>
               <div style={{ fontSize: 12, color: T.textMuted }}>
                 {workout.distanceKm} км · {workout.paceMinPerKm} мин/км ·{' '}
                 {difficultyLabel(workout.difficulty)}
@@ -537,8 +561,18 @@ function WorkoutDetail({
                 {difficultyLabel(workout.difficulty)}
               </span>
             </div>
-            <h1 style={{ margin: 0, fontSize: 30, lineHeight: 1.15 }}>{workout.title}</h1>
-            <p style={{ margin: '8px 0 0', color: T.textMuted, maxWidth: 720 }}>
+            <h1 style={{ margin: 0, fontSize: 30, lineHeight: 1.15, overflowWrap: 'anywhere' }}>
+              {workout.title}
+            </h1>
+            <p
+              style={{
+                margin: '8px 0 0',
+                color: T.textMuted,
+                maxWidth: 720,
+                overflowWrap: 'anywhere',
+                whiteSpace: 'pre-wrap',
+              }}
+            >
               {workout.description || workout.route?.name || 'Маршрут будет уточнен организатором'}
             </p>
           </div>
@@ -702,6 +736,7 @@ function CancelWorkoutDialog({ workout, reason, saving, onReasonChange, onClose,
             required
             autoFocus
             placeholder="Например: перенос из-за погоды"
+            maxLength={INPUT_LIMITS.workoutCancelReason}
             style={modalTextarea}
           />
         </label>
@@ -801,7 +836,7 @@ function Info({ label, value }) {
       <span style={{ display: 'block', color: T.textMuted, fontSize: 12, marginBottom: 3 }}>
         {label}
       </span>
-      <strong style={{ fontSize: 13 }}>{value}</strong>
+      <strong style={{ fontSize: 13, overflowWrap: 'anywhere' }}>{value}</strong>
     </div>
   )
 }
@@ -901,6 +936,7 @@ const modalText = {
   color: T.textMuted,
   fontSize: 13,
   lineHeight: 1.5,
+  overflowWrap: 'anywhere',
 }
 
 const modalField = {

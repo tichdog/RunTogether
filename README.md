@@ -1,58 +1,115 @@
-﻿# RunTogether
+# RunTogether
 
 Веб-приложение для совместных тренировок.
 
-Теперь проект собран как одно full-stack Next.js-приложение:
+Проект собран как одно full-stack Next.js-приложение:
 
-- `sport-app` - единое Next.js-приложение: React UI, App Router, API routes, PostgreSQL, Prisma, JWT в httpOnly cookie.
-- Клиентский React-код находится в `sport-app/src/client`.
-- Next-страницы и API находятся в `sport-app/src/app`.
+- `sport-app` - React UI, Next.js App Router, API routes, Prisma и PostgreSQL.
+- Клиентский код: `sport-app/src/client`.
+- Страницы и API: `sport-app/src/app`.
+- Серверная логика: `sport-app/src/lib`.
 
-## Быстрый запуск через Docker
+## Что нужно установить
 
-Нужно установить только Docker Desktop. Node.js, npm, PostgreSQL, Prisma, Grafana и остальные зависимости локально ставить не нужно. Контейнеры используют Node.js 24.
+- Node.js 24 или новее.
+- npm.
+- PostgreSQL 17 или совместимую версию.
 
-Из корня проекта:
+
+## Первый запуск
+
+Открыть консоль из корня проекта:
 
 ```powershell
-docker compose up --build
+cd sport-app
+Copy-Item .env.example .env
 ```
 
-После запуска будут доступны:
+Проверь `DATABASE_URL` в файле `sport-app/.env`.
+Для локального PostgreSQL обычно подходит:
+
+```env
+DATABASE_URL=postgres://postgres:postgres@localhost:5432/sport_training
+```
+
+Если у PostgreSQL другой пароль, пользователь или порт, поправь строку под свою установку.
+
+Создай базу данных:
+
+```powershell
+psql -U postgres -c "CREATE DATABASE sport_training;"
+```
+
+Установи зависимости:
+
+```powershell
+npm install
+```
+
+Примени схему и seed-данные:
+
+```powershell
+npm run db:schema
+npm run db:seed
+```
+
+Запусти приложение:
+
+```powershell
+npm run dev
+```
+
+После запуска:
 
 - приложение: http://localhost:4000
 - API: http://localhost:4000/api
 - healthcheck: http://localhost:4000/health
-- Grafana: http://localhost:3001
-- PostgreSQL: `localhost:5433`
-- Loki: http://localhost:3100
 
-Если порт приложения занят, его можно переопределить перед запуском:
+## Логи, Grafana и Loki
 
-```powershell
-$env:APP_PORT = "4010"
-$env:CLIENT_ORIGIN = "http://localhost:4010"
-docker compose up --build
+Приложение пишет Pino-логи в консоль и в файл:
+
+```text
+sport-app/logs/app.log
 ```
 
-Grafana:
+Чтобы смотреть эти логи в Grafana, Loki, Promtail и Grafana подять через Docker:
+
+```powershell
+docker compose up -d 
+```
+
+После запуска будут доступны:
+
+- Grafana: http://localhost:3001
+- Loki: http://localhost:3100
+
+Вход в Grafana:
 
 ```text
 Login: admin
 Password: admin
 ```
 
-PostgreSQL:
+Promtail читает локальные файлы из `sport-app/logs/*.log` и отправляет их в Loki. В Grafana открой **Explore**, выбери **Loki** и выполни запрос:
 
-```text
-Host: localhost
-Port: 5433
-Database: sport_training
-User: postgres
-Password: postgres
+Полезные запросы:
+
+```logql
+{service="sport-app"} |= "Request completed"
 ```
 
-При первом запуске PostgreSQL автоматически применяет `sport-app/src/db/schema.sql` и `sport-app/src/db/seed.sql`.
+```logql
+{service="sport-app", status=~"5.."}
+```
+
+Готовый dashboard лежит в Grafana в разделе **Dashboards** -> **Sport App** -> **Sport App Logs**.
+
+Остановить observability-контейнеры:
+
+```powershell
+docker compose down
+```
 
 ## Тестовый вход
 
@@ -73,65 +130,79 @@ Email: mark@sport.local
 Password: Admin12345!
 ```
 
-## Остановка
-
-Остановить контейнеры:
-
-```powershell
-docker compose down
-```
-
-Остановить контейнеры и удалить данные PostgreSQL, Grafana и Loki:
-
-```powershell
-docker compose down -v
-```
-
-После `docker compose down -v` следующий запуск заново создаст базу и применит seed.
-
 ## Полезные команды
 
-Пересобрать контейнеры:
+Проверить сборку:
 
 ```powershell
-docker compose up --build
+npm run build
 ```
 
-Посмотреть логи всех сервисов:
+Запустить production-сборку:
 
 ```powershell
-docker compose logs -f
+npm run build
+npm run start
 ```
 
-Посмотреть логи только приложения:
+Проверить код:
 
 ```powershell
-docker compose logs -f app
+npm run lint
+npm run format:check
 ```
 
-Зайти в Prisma Studio:
+Автоформатирование:
 
 ```powershell
-docker compose exec app npx prisma studio --hostname 0.0.0.0 --port 5555
+npm run format
 ```
 
-После запуска Prisma Studio будет доступна на http://localhost:5555.
-
-## Локальный запуск без Docker
-
-Локальный запуск по-прежнему возможен, но для обычного старта проекта предпочтительнее Docker Compose.
+Открыть Prisma Studio:
 
 ```powershell
-cd sport-app
-Copy-Item .env.example .env
-npm install
-npm run dev
+npm run db:studio
 ```
 
-Инфраструктура отдельно:
+Перегенерировать Prisma Client:
 
 ```powershell
-cd sport-app
-docker compose --profile database up -d postgres
-npm run observability:up
+npm run prisma:generate
+```
+
+## Если база уже была создана
+
+Если нужно пересоздать локальную базу с нуля:
+
+```powershell
+psql -U postgres -c "DROP DATABASE IF EXISTS sport_training;"
+psql -U postgres -c "CREATE DATABASE sport_training;"
+npm run db:schema
+npm run db:seed
+```
+
+## Переменные окружения
+
+Основные переменные лежат в `sport-app/.env`.
+
+Самые важные:
+
+- `DATABASE_URL` - подключение к PostgreSQL.
+- `JWT_SECRET` - секрет для JWT.
+- `CRON_SECRET` - секрет для cron endpoint.
+- `CLIENT_ORIGIN` - адрес приложения, обычно `http://localhost:4000`.
+- `UPLOAD_DIR` - папка для загруженных файлов, по умолчанию `public/uploads`.
+
+Для локальной разработки dummy-ключи Turnstile уже прописаны в `.env.example`.
+
+## Структура
+
+```text
+sport-app/
+  src/app/          Next.js pages, layouts и API routes
+  src/client/       React-интерфейс
+  src/lib/          серверные сервисы, репозитории, auth, env
+  src/db/           SQL schema, seed и миграционные скрипты
+  prisma/           Prisma schema
+  public/           статические файлы и uploads
 ```

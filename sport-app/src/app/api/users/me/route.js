@@ -1,4 +1,5 @@
 import { requireAuth } from '@/lib/server/auth'
+import { INPUT_LIMITS } from '@/lib/input-limits'
 import { dbId, now, prisma } from '@/lib/server/db'
 import { badRequest } from '@/lib/server/http-error'
 import { publicUser } from '@/lib/mappers/user'
@@ -31,6 +32,10 @@ export const PATCH = route(async (request) => {
 
   if (!['male', 'female'].includes(gender)) {
     throw badRequest('Некорректный пол')
+  }
+
+  if (phone && String(phone).length > INPUT_LIMITS.phone) {
+    throw badRequest('Некорректный телефон')
   }
 
   try {

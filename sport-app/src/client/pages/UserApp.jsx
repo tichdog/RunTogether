@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { api } from '../api/client'
 import { ReportUserButton } from '../components/ReportUserButton'
+import { INPUT_LIMITS } from '@/lib/input-limits'
 
 const EMPTY_FILTERS = {
   query: '',
@@ -955,6 +956,7 @@ function CancelWorkoutDialog({ draft, saving, onReasonChange, onClose, onSubmit 
             rows={4}
             required
             autoFocus
+            maxLength={INPUT_LIMITS.workoutCancelReason}
             placeholder="Например: перенос из-за погоды"
           />
         </label>
@@ -1083,6 +1085,7 @@ function WorkoutsScreen({
           <input
             value={filters.query}
             onChange={(event) => setFilters((prev) => ({ ...prev, query: event.target.value }))}
+            maxLength={INPUT_LIMITS.search}
             placeholder="Поиск по названию, месту или организатору"
           />
         </label>
@@ -1620,7 +1623,7 @@ function OrganizerReviewForm({ disabled, onReview }) {
       <textarea
         value={text}
         onChange={(event) => setText(event.target.value)}
-        maxLength={1000}
+        maxLength={INPUT_LIMITS.reviewText}
         placeholder="Что было хорошо, что можно улучшить"
         disabled={disabled}
       />
@@ -1665,7 +1668,12 @@ function WorkoutForm({ mode, form, setForm, saving, minLeadHours = 0, onSubmit }
       <form className="rt-form rt-panel" onSubmit={onSubmit}>
         <label className="wide">
           <span>Название</span>
-          <input value={form.title} onChange={set('title')} maxLength={80} required />
+          <input
+            value={form.title}
+            onChange={set('title')}
+            maxLength={INPUT_LIMITS.workoutTitle}
+            required
+          />
         </label>
         <label>
           <span>Дата и время</span>
@@ -1699,15 +1707,29 @@ function WorkoutForm({ mode, form, setForm, saving, minLeadHours = 0, onSubmit }
         </label>
         <label>
           <span>Точка сбора</span>
-          <input value={form.meetingName} onChange={set('meetingName')} maxLength={120} required />
+          <input
+            value={form.meetingName}
+            onChange={set('meetingName')}
+            maxLength={INPUT_LIMITS.workoutMeetingName}
+            required
+          />
         </label>
         <label>
           <span>Адрес</span>
-          <input value={form.meetingAddress} onChange={set('meetingAddress')} maxLength={160} />
+          <input
+            value={form.meetingAddress}
+            onChange={set('meetingAddress')}
+            maxLength={INPUT_LIMITS.workoutMeetingAddress}
+          />
         </label>
         <label>
           <span>Маршрут</span>
-          <input value={form.routeName} onChange={set('routeName')} maxLength={120} required />
+          <input
+            value={form.routeName}
+            onChange={set('routeName')}
+            maxLength={INPUT_LIMITS.workoutRouteName}
+            required
+          />
         </label>
         <label>
           <span>Дистанция, км</span>
@@ -1750,7 +1772,7 @@ function WorkoutForm({ mode, form, setForm, saving, minLeadHours = 0, onSubmit }
             value={form.description}
             onChange={set('description')}
             rows={4}
-            maxLength={600}
+            maxLength={INPUT_LIMITS.workoutDescription}
           />
         </label>
         <div className="rt-form-actions wide">
@@ -1805,7 +1827,12 @@ function ProfileScreen({
           <h1>{user.name}</h1>
           <span className="rt-profile-email">{user.email || 'Email скрыт'}</span>
           <label className="rt-avatar-upload">
-            <input type="file" accept="image/*" onChange={uploadAvatar} disabled={saving} />
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              onChange={uploadAvatar}
+              disabled={saving}
+            />
             <span>
               <Icon name="camera" />
               {saving ? 'Загрузка...' : 'Загрузить фото'}
@@ -1823,6 +1850,7 @@ function ProfileScreen({
             value={profile.firstName}
             onChange={set('firstName')}
             autoComplete="given-name"
+            maxLength={INPUT_LIMITS.firstName}
             required
           />
           <small className={`rt-field-hint ${firstNameError ? 'error' : 'empty'}`}>
@@ -1835,6 +1863,7 @@ function ProfileScreen({
             value={profile.lastName}
             onChange={set('lastName')}
             autoComplete="family-name"
+            maxLength={INPUT_LIMITS.lastName}
             required
           />
           <small className={`rt-field-hint ${lastNameError ? 'error' : 'empty'}`}>
@@ -1850,7 +1879,12 @@ function ProfileScreen({
         </label>
         <label>
           <span>Телефон</span>
-          <input value={profile.phone} onChange={set('phone')} placeholder="+7..." />
+          <input
+            value={profile.phone}
+            onChange={set('phone')}
+            placeholder="+7..."
+            maxLength={INPUT_LIMITS.phone}
+          />
         </label>
         <label className="rt-checkbox wide">
           <input type="checkbox" checked={profile.hideEmail} onChange={set('hideEmail')} />

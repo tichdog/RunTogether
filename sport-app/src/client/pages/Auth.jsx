@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../api/client'
+import { INPUT_LIMITS } from '@/lib/input-limits'
 
 const DEFAULT_TURNSTILE_SITE_KEY = '1x00000000000000000000AA'
 const DUMMY_TURNSTILE_TOKEN = 'XXXX.DUMMY.TOKEN.XXXX'
@@ -326,7 +327,13 @@ export function Auth({ onAuth }) {
           {mode === 'login' ? (
             <label>
               <span>Email или телефон</span>
-              <input value={form.login} onChange={set('login')} autoComplete="username" required />
+              <input
+                value={form.login}
+                onChange={set('login')}
+                autoComplete="username"
+                maxLength={INPUT_LIMITS.login}
+                required
+              />
               {loginEmailError && <small className="field-hint error">{loginEmailError}</small>}
             </label>
           ) : (
@@ -338,6 +345,7 @@ export function Auth({ onAuth }) {
                     value={form.firstName}
                     onChange={set('firstName')}
                     autoComplete="given-name"
+                    maxLength={INPUT_LIMITS.firstName}
                     required
                   />
                   {fieldErrors.firstName && (
@@ -350,6 +358,7 @@ export function Auth({ onAuth }) {
                     value={form.lastName}
                     onChange={set('lastName')}
                     autoComplete="family-name"
+                    maxLength={INPUT_LIMITS.lastName}
                     required
                   />
                   {fieldErrors.lastName && (
@@ -389,6 +398,7 @@ export function Auth({ onAuth }) {
                   onChange={set('email')}
                   type="email"
                   autoComplete="email"
+                  maxLength={INPUT_LIMITS.email}
                   required
                 />
                 {emailHint && <small className={`field-hint ${emailHintTone}`}>{emailHint}</small>}
@@ -404,6 +414,7 @@ export function Auth({ onAuth }) {
                 onChange={set('password')}
                 type={showPassword ? 'text' : 'password'}
                 autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                maxLength={INPUT_LIMITS.password}
                 onCopy={preventPasswordCopy}
                 onCut={preventPasswordCopy}
                 onContextMenu={preventPasswordCopy}
@@ -441,6 +452,7 @@ export function Auth({ onAuth }) {
                     onChange={set('passwordConfirm')}
                     type={showPasswordConfirm ? 'text' : 'password'}
                     autoComplete="new-password"
+                    maxLength={INPUT_LIMITS.password}
                     onCopy={preventPasswordCopy}
                     onCut={preventPasswordCopy}
                     onContextMenu={preventPasswordCopy}

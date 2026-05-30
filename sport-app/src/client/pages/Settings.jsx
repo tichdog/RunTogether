@@ -110,6 +110,8 @@ export function Settings({ currentUser }) {
             <Input
               type="number"
               value={settings.default_participant_limit}
+              min={1}
+              max={200}
               onChange={(e) => set('default_participant_limit')(Number(e.target.value))}
               style={{ width: 90 }}
             />
@@ -119,6 +121,8 @@ export function Settings({ currentUser }) {
             <Input
               type="number"
               value={settings.auto_block_complaints_count}
+              min={1}
+              max={100}
               onChange={(e) => set('auto_block_complaints_count')(Number(e.target.value))}
               style={{ width: 90 }}
             />
@@ -129,6 +133,7 @@ export function Settings({ currentUser }) {
               type="number"
               value={settings.workout_create_min_lead_hours}
               min={0}
+              max={168}
               step={0.5}
               onChange={(e) => set('workout_create_min_lead_hours')(Number(e.target.value))}
               style={{ width: 90 }}
@@ -140,6 +145,7 @@ export function Settings({ currentUser }) {
               type="number"
               value={settings.review_window_days}
               min={1}
+              max={365}
               onChange={(e) => set('review_window_days')(Number(e.target.value))}
               style={{ width: 90 }}
             />
@@ -150,6 +156,7 @@ export function Settings({ currentUser }) {
               type="number"
               value={settings.notification_retention_days}
               min={1}
+              max={3650}
               onChange={(e) => set('notification_retention_days')(Number(e.target.value))}
               style={{ width: 90 }}
             />
@@ -167,6 +174,7 @@ export function Settings({ currentUser }) {
               type="number"
               value={settings.workout_archive_retention_days}
               min={1}
+              max={3650}
               disabled={!isSuperAdmin}
               onChange={(e) => set('workout_archive_retention_days')(Number(e.target.value))}
               style={{ width: 90 }}

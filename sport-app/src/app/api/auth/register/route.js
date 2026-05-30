@@ -1,4 +1,5 @@
 import bcrypt from 'bcryptjs'
+import { INPUT_LIMITS } from '@/lib/input-limits'
 import { prisma } from '@/lib/server/db'
 import { badRequest, HttpError } from '@/lib/server/http-error'
 import { json, readJson, route } from '@/lib/server/response'
@@ -45,13 +46,16 @@ export const POST = route(async (request) => {
       'Фамилия должна содержать буквы от 2 до 15 символов. Двойная фамилия пишется через дефис'
     )
   }
-  if (!email || !EMAIL_RE.test(email)) {
+  if (!email || email.length > INPUT_LIMITS.email || !EMAIL_RE.test(email)) {
     throw badRequest('Некорректный email')
+  }
+  if (phone && phone.length > INPUT_LIMITS.phone) {
+    throw badRequest('Некорректный телефон')
   }
   if (!['male', 'female'].includes(gender)) {
     throw badRequest('Укажите пол')
   }
-  if (!STRONG_PASSWORD_RE.test(password)) {
+  if (password.length > INPUT_LIMITS.password || !STRONG_PASSWORD_RE.test(password)) {
     throw badRequest(
       'Пароль должен быть от 8 символов и содержать прописные, строчные буквы, цифры и символы'
     )

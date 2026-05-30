@@ -1,18 +1,25 @@
 import { isAdmin, requireAdmin, requireAuth } from '@/lib/server/auth'
+import { INPUT_LIMITS } from '@/lib/input-limits'
 import { mapReport, reportInclude } from '@/lib/mappers/report'
 import { dbId, now, prisma } from '@/lib/server/db'
 import { badRequest } from '@/lib/server/http-error'
 import { json, readJson, route } from '@/lib/server/response'
+import { cleanLimitedText } from '@/lib/server/validation'
 import { getSettings } from '@/lib/services/settings'
 
 export const POST = route(async (request) => {
   const user = await requireAuth(request)
   const body = await readJson(request)
   const reportedUserId = Number(body.reportedUserId || body.reported_user_id)
-  const reason = String(body.reason || '').trim()
-  const details = String(body.details || '').trim()
+  const reason = cleanLimitedText(body.reason, 'Причина жалобы', {
+    max: INPUT_LIMITS.reportReason,
+    required: true,
+  })
+  const details = cleanLimitedText(body.details, 'Описание жалобы', {
+    max: INPUT_LIMITS.reportDetails,
+  })
 
-  if (!reportedUserId || !reason) throw badRequest('Укажите пользователя и причину жалобы')
+  if (!reportedUserId) throw badRequest('Укажите пользователя и причину жалобы')
   if (Number(reportedUserId) === Number(user.id))
     throw badRequest('Нельзя отправить жалобу на себя')
 

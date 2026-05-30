@@ -1,8 +1,10 @@
 import { isAdmin, requireAdmin, requireAuth } from '@/lib/server/auth'
+import { INPUT_LIMITS, truncateText } from '@/lib/input-limits'
 import { mapReport, reportInclude } from '@/lib/mappers/report'
 import { dbId, now, prisma } from '@/lib/server/db'
 import { badRequest, forbidden, notFound } from '@/lib/server/http-error'
 import { json, readJson, route } from '@/lib/server/response'
+import { cleanLimitedText } from '@/lib/server/validation'
 import { createNotification } from '@/lib/services/notifications'
 
 function banUntilFromBody(body) {
@@ -40,7 +42,11 @@ export const PATCH = route(async (request, context) => {
   const { id } = await context.params
   const body = await readJson(request)
   const action = String(body.action || body.status || '').trim()
-  const moderatorComment = String(body.moderatorComment || body.comment || '').trim()
+  const moderatorComment = cleanLimitedText(
+    body.moderatorComment || body.comment,
+    'Комментарий модератора',
+    { max: INPUT_LIMITS.moderatorComment }
+  )
 
   if (!['warn', 'ban', 'dismiss', 'reviewed', 'dismissed'].includes(action)) {
     throw badRequest('Некорректное решение по жалобе')
@@ -72,9 +78,12 @@ export const PATCH = route(async (request, context) => {
     }
 
     if (action === 'warn' || action === 'reviewed') {
-      const warningText = String(
-        body.warningText || report.reason || 'Предупреждение по жалобе'
-      ).trim()
+      const warningText = body.warningText
+        ? cleanLimitedText(body.warningText, 'Текст предупреждения', {
+            max: INPUT_LIMITS.reportReason,
+            required: true,
+          })
+        : truncateText(report.reason || 'Предупреждение по жалобе', INPUT_LIMITS.reportReason)
       const warningMessage = moderatorComment || warningText
       await tx.user_warnings.create({
         data: {
@@ -118,7 +127,7 @@ export const PATCH = route(async (request, context) => {
     }
 
     const banUntil = banUntilFromBody(body)
-    const reason = moderatorComment || report.reason
+    const reason = moderatorComment || truncateText(report.reason, INPUT_LIMITS.reportReason)
     await tx.users.update({
       where: { id: report.reported_user_id },
       data: {

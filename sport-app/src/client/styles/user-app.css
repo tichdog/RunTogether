@@ -1448,6 +1448,47 @@
   flex: 0 0 auto;
 }
 
+.rt-card-main > div,
+.rt-workout-header > div,
+.rt-public-profile > div,
+.rt-profile-main,
+.rt-request > div,
+.rt-review-target > div,
+.rt-notification > div,
+.rt-achievement > div,
+.rt-user-list-item > span:not(.rt-avatar) {
+  min-width: 0;
+}
+
+.rt-card-main h2,
+.rt-card-main p,
+.rt-workout-header h1,
+.rt-workout-header p,
+.rt-public-profile h1,
+.rt-public-profile p,
+.rt-profile-head h1,
+.rt-info-grid strong,
+.rt-request strong,
+.rt-request span,
+.rt-request em,
+.rt-review-target strong,
+.rt-review-target span,
+.rt-review-result p,
+.rt-notification strong,
+.rt-notification p,
+.rt-achievement strong,
+.rt-achievement em,
+.rt-cancel-dialog p,
+.rt-section-head h2 {
+  overflow-wrap: anywhere;
+}
+
+.rt-workout-header p,
+.rt-review-result p,
+.rt-notification p {
+  white-space: pre-wrap;
+}
+
 .rt-bottom-nav {
   display: none;
 }
