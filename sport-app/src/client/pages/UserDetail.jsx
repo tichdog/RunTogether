@@ -163,7 +163,7 @@ export function UserDetail({ user, currentAdmin, onBack, onChanged, onDeleted })
                 >
                   <input
                     type="file"
-                    accept="image/*"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
                     onChange={saveAvatar}
                     disabled={!canChangeAvatar || avatarSaving}
                     style={{

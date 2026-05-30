@@ -34,8 +34,42 @@ function corsHeaders(request) {
   return headers
 }
 
+function allowedOriginsFor(request) {
+  return new Set([...configuredOrigins(), requestOrigin(request)].filter(Boolean))
+}
+
+function isStateChangingRequest(request) {
+  return ['POST', 'PATCH', 'DELETE'].includes(request.method)
+}
+
+function hasTrustedOrigin(request) {
+  const origin = request.headers.get('origin')
+  if (!origin) return true
+  return allowedOriginsFor(request).has(origin)
+}
+
+function uploadSecurityHeaders(headers) {
+  headers.set('X-Content-Type-Options', 'nosniff')
+  headers.set('Content-Security-Policy', "default-src 'none'; img-src 'self' data:; sandbox")
+  return headers
+}
+
 export function middleware(request) {
   const headers = corsHeaders(request)
+  const pathname = request.nextUrl?.pathname || new URL(request.url).pathname
+  const isUpload = pathname.startsWith('/uploads/')
+
+  if (isStateChangingRequest(request) && !hasTrustedOrigin(request)) {
+    return NextResponse.json({ error: 'Forbidden origin' }, { status: 403, headers })
+  }
+
+  if (isUpload) {
+    uploadSecurityHeaders(headers)
+
+    if (pathname.toLowerCase().endsWith('.svg')) {
+      return new NextResponse(null, { status: 404, headers })
+    }
+  }
 
   if (request.method === 'OPTIONS') {
     return new NextResponse(null, { status: 204, headers })

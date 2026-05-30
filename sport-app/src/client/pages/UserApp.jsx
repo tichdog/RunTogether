@@ -1805,7 +1805,12 @@ function ProfileScreen({
           <h1>{user.name}</h1>
           <span className="rt-profile-email">{user.email || 'Email скрыт'}</span>
           <label className="rt-avatar-upload">
-            <input type="file" accept="image/*" onChange={uploadAvatar} disabled={saving} />
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              onChange={uploadAvatar}
+              disabled={saving}
+            />
             <span>
               <Icon name="camera" />
               {saving ? 'Загрузка...' : 'Загрузить фото'}
