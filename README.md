@@ -1,11 +1,12 @@
-# RunTogether
+﻿# RunTogether
 
 Веб-приложение для совместных тренировок.
 
-Проект состоит из двух частей:
+Теперь проект собран как одно full-stack Next.js-приложение:
 
-- `sport-backend` - Next.js API, PostgreSQL, Prisma, JWT в httpOnly cookie.
-- `sport-frontend` - React + Vite frontend для админки и клиентского интерфейса.
+- `sport-app` - единое Next.js-приложение: React UI, App Router, API routes, PostgreSQL, Prisma, JWT в httpOnly cookie.
+- Клиентский React-код находится в `sport-app/src/client`.
+- Next-страницы и API находятся в `sport-app/src/app`.
 
 ## Быстрый запуск через Docker
 
@@ -19,19 +20,18 @@ docker compose up --build
 
 После запуска будут доступны:
 
-- frontend: http://localhost:5173
-- backend API: http://localhost:4000/api
-- backend healthcheck: http://localhost:4000/health
+- приложение: http://localhost:4000
+- API: http://localhost:4000/api
+- healthcheck: http://localhost:4000/health
 - Grafana: http://localhost:3001
 - PostgreSQL: `localhost:5433`
 - Loki: http://localhost:3100
 
-Если какой-то порт занят, его можно переопределить перед запуском:
+Если порт приложения занят, его можно переопределить перед запуском:
 
 ```powershell
-$env:BACKEND_PORT = "4010"
-$env:FRONTEND_PORT = "5175"
-$env:CLIENT_ORIGIN = "http://localhost:5175"
+$env:APP_PORT = "4010"
+$env:CLIENT_ORIGIN = "http://localhost:4010"
 docker compose up --build
 ```
 
@@ -52,7 +52,7 @@ User: postgres
 Password: postgres
 ```
 
-При первом запуске PostgreSQL автоматически применяет `sport-backend/src/db/schema.sql` и `sport-backend/src/db/seed.sql`.
+При первом запуске PostgreSQL автоматически применяет `sport-app/src/db/schema.sql` и `sport-app/src/db/seed.sql`.
 
 ## Тестовый вход
 
@@ -103,16 +103,16 @@ docker compose up --build
 docker compose logs -f
 ```
 
-Посмотреть логи только backend:
+Посмотреть логи только приложения:
 
 ```powershell
-docker compose logs -f backend
+docker compose logs -f app
 ```
 
 Зайти в Prisma Studio:
 
 ```powershell
-docker compose exec backend npx prisma studio --hostname 0.0.0.0 --port 5555
+docker compose exec app npx prisma studio --hostname 0.0.0.0 --port 5555
 ```
 
 После запуска Prisma Studio будет доступна на http://localhost:5555.
@@ -121,27 +121,17 @@ docker compose exec backend npx prisma studio --hostname 0.0.0.0 --port 5555
 
 Локальный запуск по-прежнему возможен, но для обычного старта проекта предпочтительнее Docker Compose.
 
-Backend:
-
 ```powershell
-cd sport-backend
+cd sport-app
 Copy-Item .env.example .env
 npm install
 npm run dev
 ```
 
-Frontend:
+Инфраструктура отдельно:
 
 ```powershell
-cd sport-frontend
-npm install
-npm run dev
-```
-
-Инфраструктура backend отдельно:
-
-```powershell
-cd sport-backend
+cd sport-app
 docker compose --profile database up -d postgres
 npm run observability:up
 ```

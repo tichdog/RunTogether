@@ -1,4 +1,4 @@
-services:
+﻿services:
   postgres:
     image: postgres:17-alpine
     restart: unless-stopped
@@ -10,17 +10,17 @@ services:
       - '${POSTGRES_PORT:-5433}:5432'
     volumes:
       - sport_postgres_data:/var/lib/postgresql/data
-      - ./sport-backend/src/db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
-      - ./sport-backend/src/db/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro
+      - ./sport-app/src/db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./sport-app/src/db/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U postgres -d sport_training']
       interval: 5s
       timeout: 5s
       retries: 20
 
-  backend:
+  app:
     build:
-      context: ./sport-backend
+      context: ./sport-app
     restart: unless-stopped
     depends_on:
       postgres:
@@ -28,7 +28,8 @@ services:
     environment:
       NODE_ENV: development
       PORT: 4000
-      CLIENT_ORIGIN: ${CLIENT_ORIGIN:-http://localhost:5173,http://localhost:5174}
+      CLIENT_ORIGIN: ${CLIENT_ORIGIN:-http://localhost:4000}
+      NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${NEXT_PUBLIC_TURNSTILE_SITE_KEY:-1x00000000000000000000AA}
       DATABASE_URL: postgres://postgres:postgres@postgres:5432/sport_training
       JWT_SECRET: change-this-jwt-secret-at-least-32-characters
       JWT_ACCESS_EXPIRES_IN: 15m
@@ -37,41 +38,25 @@ services:
       ACCESS_COOKIE_MAX_AGE_SECONDS: 900
       REFRESH_COOKIE_MAX_AGE_SECONDS: 2592000
       LOG_LEVEL: info
-      LOG_FILE: logs/backend.log
+      LOG_FILE: logs/app.log
       UPLOAD_DIR: public/uploads
       MAX_UPLOAD_BYTES: 3145728
       CRON_SECRET: change-this-cron-secret-at-least-32-characters
-      CRON_URL: http://backend:4000/api/cron/workouts
+      CRON_URL: http://app:4000/api/cron/workouts
       CRON_INTERVAL_MS: 3600000
       TURNSTILE_SECRET_KEY: 1x0000000000000000000000000000000AA
       NEXT_TELEMETRY_DISABLED: 1
     ports:
-      - '${BACKEND_PORT:-4000}:4000'
+      - '${APP_PORT:-4000}:4000'
       - '${PRISMA_STUDIO_PORT:-5555}:5555'
     volumes:
-      - ./sport-backend:/app
-      - sport_backend_node_modules:/app/node_modules
-      - sport_backend_next:/app/.next
-      - sport_backend_prisma_generated:/app/src/generated/prisma
-      - sport_backend_uploads:/app/public/uploads
-      - sport_backend_logs:/app/logs
+      - ./sport-app:/app
+      - sport_app_node_modules:/app/node_modules
+      - sport_app_next:/app/.next
+      - sport_app_prisma_generated:/app/src/generated/prisma
+      - sport_app_uploads:/app/public/uploads
+      - sport_app_logs:/app/logs
     command: sh -c "npm run prisma:generate && npm run dev -- -H 0.0.0.0"
-
-  frontend:
-    build:
-      context: ./sport-frontend
-    restart: unless-stopped
-    depends_on:
-      - backend
-    environment:
-      VITE_PROXY_TARGET: http://backend:4000
-      VITE_TURNSTILE_SITE_KEY: 1x00000000000000000000AA
-    ports:
-      - '${FRONTEND_PORT:-5173}:5173'
-    volumes:
-      - ./sport-frontend:/app
-      - sport_frontend_node_modules:/app/node_modules
-    command: npm run dev -- --host 0.0.0.0
 
   loki:
     image: grafana/loki:latest
@@ -80,7 +65,7 @@ services:
     ports:
       - '${LOKI_PORT:-3100}:3100'
     volumes:
-      - ./sport-backend/observability/loki/config.yml:/etc/loki/config.yml:ro
+      - ./sport-app/observability/loki/config.yml:/etc/loki/config.yml:ro
       - sport_loki_data:/loki
 
   promtail:
@@ -89,10 +74,10 @@ services:
     command: -config.file=/etc/promtail/config.yml
     depends_on:
       - loki
-      - backend
+      - app
     volumes:
-      - ./sport-backend/observability/promtail/config.yml:/etc/promtail/config.yml:ro
-      - sport_backend_logs:/var/log/sport-backend:ro
+      - ./sport-app/observability/promtail/config.yml:/etc/promtail/config.yml:ro
+      - sport_app_logs:/var/log/sport-app:ro
 
   grafana:
     image: grafana/grafana-oss:11.6.0
@@ -112,16 +97,15 @@ services:
       - '${GRAFANA_PORT:-3001}:3000'
     volumes:
       - sport_grafana_data:/var/lib/grafana
-      - ./sport-backend/observability/grafana/provisioning:/etc/grafana/provisioning:ro
-      - ./sport-backend/observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - ./sport-app/observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./sport-app/observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
 
 volumes:
   sport_postgres_data:
-  sport_backend_node_modules:
-  sport_backend_next:
-  sport_backend_prisma_generated:
-  sport_backend_uploads:
-  sport_backend_logs:
-  sport_frontend_node_modules:
+  sport_app_node_modules:
+  sport_app_next:
+  sport_app_prisma_generated:
+  sport_app_uploads:
+  sport_app_logs:
   sport_loki_data:
   sport_grafana_data:
