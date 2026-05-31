@@ -7,8 +7,7 @@ export const metadata = {
   description: 'Collaborative training app',
   icons: {
     icon: [
-      { url: '/favicon.svg', type: 'image/svg+xml' },
-      { url: '/favicon.png', type: 'image/png' },
+      { url: '/favicon.png', type: 'image/png', sizes: 'any' },
     ],
   },
 }
