@@ -1,11 +1,40 @@
-import fs from 'node:fs/promises'
 import path from 'node:path'
 import { randomUUID } from 'node:crypto'
+import {
+  CreateBucketCommand,
+  GetObjectCommand,
+  HeadBucketCommand,
+  PutObjectCommand,
+  S3Client,
+} from '@aws-sdk/client-s3'
 import { env } from './env'
-import { uploadDir } from './upload-env'
 import { badRequest, notFound } from './http-error'
 
 const IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif'])
+
+const s3 = new S3Client({
+  endpoint: env.s3Endpoint,
+  region: env.s3Region,
+  forcePathStyle: env.s3ForcePathStyle,
+  credentials: {
+    accessKeyId: env.s3AccessKeyId,
+    secretAccessKey: env.s3SecretAccessKey,
+  },
+})
+
+let bucketReadyPromise
+
+async function ensureBucket() {
+  bucketReadyPromise ||= (async () => {
+    try {
+      await s3.send(new HeadBucketCommand({ Bucket: env.s3Bucket }))
+    } catch {
+      await s3.send(new CreateBucketCommand({ Bucket: env.s3Bucket }))
+    }
+  })()
+
+  return bucketReadyPromise
+}
 
 function extensionFor(file) {
   const ext = path.extname(file.name || '').toLowerCase()
@@ -74,6 +103,19 @@ function detectedImageType(bytes) {
   return null
 }
 
+async function bodyToBuffer(body) {
+  if (!body) return Buffer.alloc(0)
+  if (typeof body.transformToByteArray === 'function') {
+    return Buffer.from(await body.transformToByteArray())
+  }
+
+  const chunks = []
+  for await (const chunk of body) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
+  }
+  return Buffer.concat(chunks)
+}
+
 export async function saveImageUpload(file) {
   if (!file || typeof file.arrayBuffer !== 'function') {
     throw badRequest('Файл не передан')
@@ -90,28 +132,37 @@ export async function saveImageUpload(file) {
     throw badRequest('Содержимое файла не похоже на разрешенное изображение')
   }
 
-  const root = uploadDir()
-  await fs.mkdir(root, { recursive: true })
-  const filename = `${Date.now()}-${randomUUID()}${extensionFor(file)}`
-  const filepath = path.join(root, filename)
-  await fs.writeFile(filepath, bytes)
+  await ensureBucket()
+  const key = `avatars/${Date.now()}-${randomUUID()}${extensionFor(file)}`
+  await s3.send(
+    new PutObjectCommand({
+      Bucket: env.s3Bucket,
+      Key: key,
+      Body: bytes,
+      ContentType: file.type,
+    })
+  )
 
-  return `${env.uploadUrlPath}/${filename}`
+  return `${env.uploadUrlPath}/${key}`
 }
 
 export async function readUpload(segments) {
-  const filename = segments.join('/')
-  const root = path.resolve(uploadDir())
-  const filepath = path.resolve(root, filename)
-
-  if (!filepath.startsWith(`${root}${path.sep}`)) {
+  const key = segments.join('/')
+  if (!key || key.includes('..') || path.isAbsolute(key)) {
     throw notFound()
   }
 
   try {
+    const object = await s3.send(
+      new GetObjectCommand({
+        Bucket: env.s3Bucket,
+        Key: key,
+      })
+    )
+
     return {
-      bytes: await fs.readFile(filepath),
-      contentType: contentTypeFor(filepath),
+      bytes: await bodyToBuffer(object.Body),
+      contentType: object.ContentType || contentTypeFor(key),
     }
   } catch {
     throw notFound()

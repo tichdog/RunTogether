@@ -12,4 +12,6 @@ logs/
 *.log
 uploads/
 public/uploads/
+!src/app/uploads/
+!src/app/uploads/**
 src/generated/prisma/
