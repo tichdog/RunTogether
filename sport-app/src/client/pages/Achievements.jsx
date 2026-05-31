@@ -25,6 +25,7 @@ const EMPTY_FORM = {
   title: '',
   description: '',
   icon: 'medal',
+  iconImage: null,
   conditionType: 'completed_workouts',
   conditionValue: 1,
 }
@@ -37,6 +38,7 @@ export function Achievements() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
+  const [iconPreviewUrl, setIconPreviewUrl] = useState('')
 
   const editing = useMemo(
     () => achievements.find((item) => Number(item.id) === Number(editingId)) || null,
@@ -59,9 +61,32 @@ export function Achievements() {
     loadAchievements()
   }, [loadAchievements])
 
+  useEffect(() => {
+    if (!form.iconImage) {
+      setIconPreviewUrl('')
+      return undefined
+    }
+
+    const url = URL.createObjectURL(form.iconImage)
+    setIconPreviewUrl(url)
+    return () => URL.revokeObjectURL(url)
+  }, [form.iconImage])
+
   const set = (key) => (event) => {
     const value = event.target.type === 'number' ? Number(event.target.value) : event.target.value
     setForm((prev) => ({ ...prev, [key]: value }))
+  }
+
+  const setIconChoice = (event) => {
+    setForm((prev) => ({ ...prev, icon: event.target.value, iconImage: null }))
+  }
+
+  const setIconImage = (event) => {
+    const file = event.target.files?.[0]
+    if (file) {
+      setForm((prev) => ({ ...prev, icon: '', iconImage: file }))
+    }
+    event.target.value = ''
   }
 
   const resetForm = () => {
@@ -77,6 +102,7 @@ export function Achievements() {
       title: achievement.title || '',
       description: achievement.description || '',
       icon: achievement.icon || 'medal',
+      iconImage: null,
       conditionType: achievement.condition?.type || 'completed_workouts',
       conditionValue: achievement.condition?.value || 1,
     })
@@ -92,6 +118,7 @@ export function Achievements() {
       title: form.title,
       description: form.description,
       icon: form.icon,
+      iconImage: form.iconImage,
       condition: {
         type: form.conditionType,
         value: Number(form.conditionValue),
@@ -154,7 +181,9 @@ export function Achievements() {
           {!loading &&
             achievements.map((achievement) => (
               <div key={achievement.id} style={achievementRow}>
-                <div style={iconBox}>{achievement.icon}</div>
+                <div style={iconBox}>
+                  <AchievementIcon icon={achievement.icon} />
+                </div>
                 <div style={{ minWidth: 0, flex: 1 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                     <strong style={{ color: T.text, overflowWrap: 'anywhere' }}>
@@ -216,30 +245,35 @@ export function Achievements() {
               />
             </label>
             <label style={fieldStyle}>
-              <span>Код</span>
-              <Input
-                value={form.code}
-                onChange={set('code')}
-                placeholder="first_finish"
-                maxLength={INPUT_LIMITS.achievementCode}
-              />
-            </label>
-            <label style={fieldStyle}>
               <span>Значок</span>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 92px', gap: 8 }}>
-                <Select value={form.icon} onChange={set('icon')}>
+              <div style={iconPickerStyle}>
+                <div style={iconPreviewBox}>
+                  <AchievementIcon icon={iconPreviewUrl || form.icon} />
+                </div>
+                <Select
+                  value={ICONS.includes(form.icon) ? form.icon : ''}
+                  onChange={setIconChoice}
+                >
+                  <option value="" disabled>
+                    Картинка
+                  </option>
                   {ICONS.map((icon) => (
                     <option value={icon} key={icon}>
                       {icon}
                     </option>
                   ))}
                 </Select>
-                <Input
-                  value={form.icon}
-                  onChange={set('icon')}
-                  maxLength={INPUT_LIMITS.achievementIcon}
-                />
+                <label style={uploadButtonStyle}>
+                  Загрузить
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    onChange={setIconImage}
+                    style={{ display: 'none' }}
+                  />
+                </label>
               </div>
+              {form.iconImage && <small style={fileHintStyle}>{form.iconImage.name}</small>}
             </label>
             <label style={fieldStyle}>
               <span>Условие</span>
@@ -338,6 +372,89 @@ function conditionText(condition = {}) {
   return `${label}: ${condition.value || 0} ${unit}`.trim()
 }
 
+function isUploadedIcon(icon) {
+  return (
+    typeof icon === 'string' &&
+    (icon.startsWith('/uploads/') ||
+      icon.includes('/uploads/') ||
+      icon.startsWith('blob:') ||
+      icon.startsWith('data:image/'))
+  )
+}
+
+function AchievementIcon({ icon }) {
+  if (isUploadedIcon(icon)) {
+    return <img alt="" src={icon} style={iconImageStyle} />
+  }
+
+  return <AchievementSymbol name={icon} />
+}
+
+function AchievementSymbol({ name }) {
+  const common = {
+    viewBox: '0 0 24 24',
+    fill: 'none',
+    stroke: 'currentColor',
+    strokeWidth: '2',
+    strokeLinecap: 'round',
+    strokeLinejoin: 'round',
+    'aria-hidden': 'true',
+    style: symbolIconStyle,
+  }
+
+  const icons = {
+    medal: (
+      <>
+        <circle cx="12" cy="9" r="5" />
+        <path d="M8.5 13.5 7 22l5-3 5 3-1.5-8.5" />
+        <path d="M9 2h6" />
+      </>
+    ),
+    trophy: (
+      <>
+        <path d="M8 4h8v4a4 4 0 0 1-8 0z" />
+        <path d="M8 5H5a3 3 0 0 0 3 5" />
+        <path d="M16 5h3a3 3 0 0 1-3 5" />
+        <path d="M12 12v5" />
+        <path d="M8 21h8" />
+        <path d="M10 17h4" />
+      </>
+    ),
+    route: (
+      <>
+        <path d="M4 17c5-8 8 4 16-6" />
+        <circle cx="4" cy="17" r="2" />
+        <circle cx="20" cy="11" r="2" />
+      </>
+    ),
+    sunrise: (
+      <>
+        <path d="M3 18h18" />
+        <path d="M7 18a5 5 0 0 1 10 0" />
+        <path d="M12 2v4" />
+        <path d="m4.9 7.9 2.8 2.8" />
+        <path d="m19.1 7.9-2.8 2.8" />
+      </>
+    ),
+    star: <path d="m12 3 2.7 5.5 6 .9-4.3 4.2 1 5.9-5.4-2.8-5.4 2.8 1-5.9-4.3-4.2 6-.9z" />,
+    zap: <path d="M13 2 4 14h7l-1 8 10-13h-7z" />,
+    flame: (
+      <>
+        <path d="M12 22c4 0 7-3 7-7 0-3-2-6-5-9 0 3-2 5-4 6 0-2-1-4-2-5-2 3-3 5-3 8 0 4 3 7 7 7z" />
+        <path d="M12 18c1.7 0 3-1.3 3-3 0-1.2-.7-2.3-2-3.5-.2 1.2-.9 2-1.8 2.7-.2-.8-.6-1.5-1.2-2.2-.7 1.1-1 2-1 3 0 1.7 1.3 3 3 3z" />
+      </>
+    ),
+    crown: (
+      <>
+        <path d="m3 8 5 4 4-7 4 7 5-4-2 11H5z" />
+        <path d="M5 19h14" />
+      </>
+    ),
+  }
+
+  return <svg {...common}>{icons[name] || icons.medal}</svg>
+}
+
 const achievementRow = {
   display: 'flex',
   alignItems: 'flex-start',
@@ -359,6 +476,54 @@ const iconBox = {
   border: `1px solid ${T.border}`,
   fontSize: 12,
   fontWeight: 800,
+}
+
+const iconImageStyle = {
+  width: '100%',
+  height: '100%',
+  objectFit: 'cover',
+  borderRadius: T.radiusSm,
+}
+
+const symbolIconStyle = {
+  width: 22,
+  height: 22,
+  display: 'block',
+}
+
+const iconPickerStyle = {
+  display: 'grid',
+  gridTemplateColumns: '42px minmax(0, 1fr) max-content',
+  alignItems: 'center',
+  gap: 8,
+}
+
+const iconPreviewBox = {
+  ...iconBox,
+}
+
+const uploadButtonStyle = {
+  background: T.surface,
+  border: `1px solid ${T.border}`,
+  borderRadius: T.radiusSm,
+  padding: '9px 12px',
+  fontSize: 13,
+  color: T.text,
+  outline: 'none',
+  fontFamily: 'inherit',
+  minHeight: 36,
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  cursor: 'pointer',
+  fontWeight: 800,
+  whiteSpace: 'nowrap',
+}
+
+const fileHintStyle = {
+  color: T.textMuted,
+  fontSize: 12,
+  overflowWrap: 'anywhere',
 }
 
 const codePill = {

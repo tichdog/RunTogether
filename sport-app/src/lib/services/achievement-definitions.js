@@ -1,4 +1,5 @@
 import { INPUT_LIMITS } from '../input-limits'
+import { randomUUID } from 'node:crypto'
 import { badRequest } from '../server/http-error'
 
 export const ACHIEVEMENT_CONDITIONS = new Set([
@@ -8,6 +9,23 @@ export const ACHIEVEMENT_CONDITIONS = new Set([
   'organized_workouts',
 ])
 
+export function achievementBodyFromFormData(form) {
+  const body = {}
+
+  for (const key of ['code', 'title', 'description', 'icon']) {
+    if (form.has(key)) body[key] = form.get(key)
+  }
+
+  if (form.has('conditionType') || form.has('conditionValue')) {
+    body.condition = {
+      type: form.get('conditionType'),
+      value: form.get('conditionValue'),
+    }
+  }
+
+  return body
+}
+
 function cleanText(value, field, { max = 160, required = true } = {}) {
   const text = String(value || '').trim()
   if (required && !text) throw badRequest(`Поле "${field}" обязательно`)
@@ -16,14 +34,23 @@ function cleanText(value, field, { max = 160, required = true } = {}) {
 }
 
 function makeCode(title) {
+  const suffix = `_${randomUUID().replaceAll('-', '').slice(0, 6)}`
+  const maxBaseLength = Math.max(1, INPUT_LIMITS.achievementCode - suffix.length)
   const code = title
     .toLowerCase()
     .normalize('NFKD')
     .replace(/[^\p{Letter}\p{Number}]+/gu, '_')
     .replace(/^_+|_+$/g, '')
-    .slice(0, INPUT_LIMITS.achievementCode)
+    .slice(0, maxBaseLength)
 
-  return code || `achievement_${Date.now()}`
+  return `${code || 'ach'}${suffix}`.slice(0, INPUT_LIMITS.achievementCode)
+}
+
+function fallbackAchievementCode() {
+  return `ach_${randomUUID().replaceAll('-', '').slice(0, 10)}`.slice(
+    0,
+    INPUT_LIMITS.achievementCode
+  )
 }
 
 export function normalizeAchievementPayload(body, { partial = false } = {}) {
@@ -77,12 +104,12 @@ export function normalizeAchievementPayload(body, { partial = false } = {}) {
       required: !partial,
     })
       .toLowerCase()
-      .replace(/[^a-z0-9_-]/g, '_')
+      .replace(/[^\p{Letter}\p{Number}_-]/gu, '_')
       .replace(/_+/g, '_')
       .replace(/^_+|_+$/g, '')
 
     if (!payload.code) {
-      payload.code = `achievement_${Date.now()}`
+      payload.code = fallbackAchievementCode()
     }
   }
 

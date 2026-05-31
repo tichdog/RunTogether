@@ -12,7 +12,7 @@ const EMPTY_FILTERS = {
 }
 
 const NAME_RE = /^\p{L}{2,15}$/u
-const LAST_NAME_RE = /^\p{L}{2,15}(?:-\p{L}{2,15})?$/u
+const LAST_NAME_RE = /^(?=.{2,20}$)\p{L}{2,20}(?:-\p{L}{2,20})?$/u
 
 const USER_TAB_PATHS = {
   home: '/me',
@@ -1865,7 +1865,7 @@ function ProfileScreen({
       : ''
   const lastNameError =
     profile.lastName && !LAST_NAME_RE.test(profile.lastName.trim())
-      ? 'Фамилия: буквы от 2 до 15 символов. Двойная фамилия пишется через дефис.'
+      ? 'Фамилия: буквы от 2 до 20 символов. Двойная фамилия пишется через дефис.'
       : ''
   const phoneError =
     profile.phone && !isValidPhoneNumber(profile.phone)

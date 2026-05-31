@@ -19,7 +19,7 @@ function normalizePhone(phone) {
 }
 
 const NAME_RE = /^\p{L}{2,15}$/u
-const LAST_NAME_RE = /^\p{L}{2,15}(?:-\p{L}{2,15})?$/u
+const LAST_NAME_RE = /^(?=.{2,20}$)\p{L}{2,20}(?:-\p{L}{2,20})?$/u
 const EMAIL_RE = /^[A-Za-z0-9._%+-]{2,64}@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/
 const STRONG_PASSWORD_RE = /^(?=.*[a-zа-яё])(?=.*[A-ZА-ЯЁ])(?=.*\d)(?=.*[^A-Za-zА-Яа-яЁё0-9]).{8,}$/
 
@@ -44,7 +44,7 @@ export const POST = route(async (request) => {
   }
   if (!LAST_NAME_RE.test(lastName)) {
     throw badRequest(
-      'Фамилия должна содержать буквы от 2 до 15 символов. Двойная фамилия пишется через дефис'
+      'Фамилия должна содержать буквы от 2 до 20 символов. Двойная фамилия пишется через дефис'
     )
   }
   if (!email || email.length > INPUT_LIMITS.email || !EMAIL_RE.test(email)) {

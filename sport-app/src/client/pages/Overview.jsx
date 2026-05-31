@@ -5,6 +5,11 @@ import { ReportUserButton } from '../components/ReportUserButton'
 import { ROLE_COLORS, ROLE_LABELS, T } from '../tokens'
 
 const STAT_ACCENTS = [T.accent, T.success, T.warning, T.danger]
+const COMPLETED_WORKOUT_STATUSES = new Set(['completed', 'archived'])
+
+function isCompletedWorkout(workout) {
+  return COMPLETED_WORKOUT_STATUSES.has(workout.status) || workout.archived
+}
 
 export function Overview({ setActive, setSelectedUser, currentUserId }) {
   const [users, setUsers] = useState([])
@@ -16,7 +21,7 @@ export function Overview({ setActive, setSelectedUser, currentUserId }) {
   useEffect(() => {
     Promise.all([
       api.users().then((data) => setUsers(data.users)),
-      api.workouts().then((data) => setWorkouts(data.workouts)),
+      api.workouts({ includeArchived: true }).then((data) => setWorkouts(data.workouts)),
       api.activities().then((data) => setActivities(data.activities)),
       api
         .reports()
@@ -36,7 +41,7 @@ export function Overview({ setActive, setSelectedUser, currentUserId }) {
       { label: 'Жалоб', val: reports.length, sub: 'в истории модерации' },
       {
         label: 'Завершено',
-        val: workouts.filter((w) => w.status === 'completed').length,
+        val: workouts.filter(isCompletedWorkout).length,
         sub: 'тренировок',
       },
     ],
@@ -47,9 +52,6 @@ export function Overview({ setActive, setSelectedUser, currentUserId }) {
     <div style={{ padding: '32px 36px', flex: 1, overflowY: 'auto', minWidth: 0 }}>
       <div style={{ marginBottom: 28 }}>
         <h1 style={{ margin: 0, fontSize: 26, fontWeight: 800, color: T.text }}>Обзор системы</h1>
-        <p style={{ margin: '4px 0 0', fontSize: 13, color: T.textMuted }}>
-          Реальные данные из PostgreSQL через NodeJS API.
-        </p>
       </div>
 
       {error && <div style={{ color: T.danger, marginBottom: 16, fontSize: 13 }}>{error}</div>}

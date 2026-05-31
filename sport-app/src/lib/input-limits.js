@@ -3,7 +3,7 @@ export const INPUT_LIMITS = Object.freeze({
   email: 254,
   password: 128,
   firstName: 15,
-  lastName: 31,
+  lastName: 20,
   phone: 32,
   search: 120,
   reportReason: 120,
@@ -18,10 +18,10 @@ export const INPUT_LIMITS = Object.freeze({
   workoutRouteName: 120,
   workoutCancelReason: 300,
   reviewText: 1000,
-  achievementTitle: 120,
-  achievementDescription: 500,
-  achievementCode: 48,
-  achievementIcon: 40,
+  achievementTitle: 32,
+  achievementDescription: 300,
+  achievementCode: 20,
+  achievementIcon: 180,
   achievementConditionValue: 100000,
 })
 

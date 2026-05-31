@@ -137,6 +137,21 @@ function uploadAvatar(path, file) {
   })
 }
 
+function achievementBody(payload = {}) {
+  if (!payload.iconImage) return JSON.stringify(payload)
+
+  const form = new FormData()
+  if (payload.code) form.append('code', payload.code)
+  form.append('title', payload.title || '')
+  form.append('description', payload.description || '')
+  form.append('icon', payload.icon || '')
+  form.append('conditionType', payload.condition?.type || payload.conditionType || '')
+  form.append('conditionValue', String(payload.condition?.value ?? payload.conditionValue ?? ''))
+  form.append('iconImage', payload.iconImage)
+
+  return form
+}
+
 export const api = {
   register: (payload) =>
     request('/api/auth/register', {
@@ -242,12 +257,12 @@ export const api = {
   createAchievement: (payload) =>
     request('/api/achievements', {
       method: 'POST',
-      body: JSON.stringify(payload),
+      body: achievementBody(payload),
     }),
   updateAchievement: (id, payload) =>
     request(`/api/achievements/${id}`, {
       method: 'PATCH',
-      body: JSON.stringify(payload),
+      body: achievementBody(payload),
     }),
   deleteAchievement: (id) => request(`/api/achievements/${id}`, { method: 'DELETE' }),
 }
