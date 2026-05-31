@@ -3,21 +3,10 @@ import { INPUT_LIMITS, truncateText } from '@/lib/input-limits'
 import { mapReport, reportInclude } from '@/lib/mappers/report'
 import { dbId, now, prisma } from '@/lib/server/db'
 import { badRequest, forbidden, notFound } from '@/lib/server/http-error'
+import { banUntilFromBody } from '@/lib/server/moderation'
 import { json, readJson, route } from '@/lib/server/response'
 import { cleanLimitedText } from '@/lib/server/validation'
 import { createNotification } from '@/lib/services/notifications'
-
-function banUntilFromBody(body) {
-  const mode = String(body.banMode || body.duration || 'permanent')
-  if (mode === 'permanent') return null
-
-  const days = Number(body.banDays || body.days)
-  if (!Number.isFinite(days) || days <= 0) {
-    throw badRequest('Укажите срок бана в днях')
-  }
-
-  return new Date(Date.now() + days * 24 * 60 * 60 * 1000)
-}
 
 function ensureCanModerateTarget(moderator, target) {
   if (Number(moderator.id) === Number(target.id)) {

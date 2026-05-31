@@ -625,6 +625,7 @@ function WorkoutDetail({
                 }
                 label="Организатор"
                 currentUserId={currentUserId}
+                actionColumns
               />
               {participants.map((participant) => (
                 <PersonRow
@@ -632,11 +633,13 @@ function WorkoutDetail({
                   user={participant}
                   label="Участник"
                   currentUserId={currentUserId}
+                  actionColumns
                   action={
                     <Btn
                       danger
                       disabled={saving || ['completed', 'cancelled'].includes(workout.status)}
                       onClick={() => onRemoveParticipant(participant)}
+                      style={personActionButtonStyle}
                     >
                       Исключить
                     </Btn>
@@ -781,14 +784,28 @@ function RequestRow({ request, saving, onRespond, currentUserId }) {
   )
 }
 
-function PersonRow({ user, label, action, currentUserId }) {
+const personActionButtonStyle = {
+  width: '100%',
+  minHeight: 32,
+  padding: '6px 10px',
+  fontSize: 12,
+  whiteSpace: 'nowrap',
+}
+
+function PersonRow({ user, label, action, currentUserId, actionColumns = false }) {
   const reportAction = user?.id ? (
-    <ReportUserButton user={user} currentUserId={currentUserId} compact />
+    <ReportUserButton
+      user={user}
+      currentUserId={currentUserId}
+      compact
+      buttonStyle={actionColumns ? personActionButtonStyle : undefined}
+    />
   ) : null
   return (
     <div
       style={{
-        display: 'flex',
+        display: actionColumns ? 'grid' : 'flex',
+        gridTemplateColumns: actionColumns ? 'minmax(0, 1fr) 92px 108px' : undefined,
         alignItems: 'center',
         justifyContent: 'space-between',
         gap: 12,
@@ -814,18 +831,25 @@ function PersonRow({ user, label, action, currentUserId }) {
           <span style={{ display: 'block', color: T.textMuted, fontSize: 12 }}>{label}</span>
         </div>
       </div>
-      <div
-        style={{
-          display: 'flex',
-          gap: 6,
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          justifyContent: 'flex-end',
-        }}
-      >
-        {reportAction}
-        {action}
-      </div>
+      {actionColumns ? (
+        <>
+          <div style={{ minWidth: 0 }}>{reportAction}</div>
+          <div style={{ minWidth: 0 }}>{action}</div>
+        </>
+      ) : (
+        <div
+          style={{
+            display: 'flex',
+            gap: 6,
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            justifyContent: 'flex-end',
+          }}
+        >
+          {reportAction}
+          {action}
+        </div>
+      )}
     </div>
   )
 }

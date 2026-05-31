@@ -2,22 +2,12 @@ import { requireAdmin, requireAuth, isAdmin } from '@/lib/server/auth'
 import { INPUT_LIMITS } from '@/lib/input-limits'
 import { dbId, now, prisma } from '@/lib/server/db'
 import { badRequest, forbidden, notFound } from '@/lib/server/http-error'
+import { banUntilFromBody } from '@/lib/server/moderation'
 import { publicUser } from '@/lib/mappers/user'
 import { getUserRole } from '@/lib/repositories/users'
 import { json, readJson, route } from '@/lib/server/response'
 import { cleanLimitedText } from '@/lib/server/validation'
-
-function banUntilFromBody(body) {
-  const mode = String(body.banMode || body.duration || 'permanent')
-  if (mode === 'permanent') return null
-
-  const days = Number(body.banDays || body.days)
-  if (!Number.isFinite(days) || days <= 0) {
-    throw badRequest('Укажите срок бана в днях')
-  }
-
-  return new Date(Date.now() + days * 24 * 60 * 60 * 1000)
-}
+import { getSettings } from '@/lib/services/settings'
 
 export const PATCH = route(async (request, context) => {
   const user = await requireAuth(request)
@@ -71,5 +61,5 @@ export const PATCH = route(async (request, context) => {
     data,
   })
 
-  return json({ user: publicUser(updated, { viewer: user }) })
+  return json({ user: publicUser(updated, { viewer: user, settings: await getSettings() }) })
 })

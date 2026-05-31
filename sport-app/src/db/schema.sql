@@ -16,7 +16,7 @@ create table if not exists users (
   phone_verified boolean not null default false,
   email_verified boolean not null default false,
   verification_status text not null default 'unverified' check (verification_status in ('unverified', 'phone_verified', 'fully_verified')),
-  privacy_settings jsonb not null default '{"hide_email": false, "hide_phone": false}'::jsonb,
+  privacy_settings jsonb not null default '{"hide_email": true, "hide_phone": true}'::jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint users_email_or_phone check (email is not null or phone is not null)
@@ -208,7 +208,9 @@ insert into system_settings (key, value) values
   ('workout_create_min_lead_hours', '2'),
   ('workout_archive_retention_days', '90'),
   ('review_window_days', '7'),
-  ('notification_retention_days', '30')
+  ('notification_retention_days', '30'),
+  ('admins_can_view_user_emails', 'true'),
+  ('admins_can_view_user_phones', 'true')
 on conflict (key) do nothing;
 
 insert into achievements (code, title, description, icon, condition) values

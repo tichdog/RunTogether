@@ -10,6 +10,7 @@ export const INPUT_LIMITS = Object.freeze({
   reportDetails: 1000,
   moderatorComment: 500,
   userBlockReason: 300,
+  banMaxDays: 3600,
   workoutTitle: 80,
   workoutDescription: 600,
   workoutMeetingName: 120,

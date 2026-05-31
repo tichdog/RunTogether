@@ -1,15 +1,31 @@
-const ADMIN_ROLES = new Set(['admin', 'super_admin'])
-
-function canViewPrivateContacts(row, viewer) {
+function canViewEmail(row, viewer, settings) {
   if (!viewer) return false
-  return ADMIN_ROLES.has(viewer.role) || Number(row.id) === Number(viewer.id)
+  if (Number(row.id) === Number(viewer.id)) return true
+  if (viewer.role === 'super_admin') return true
+  if (viewer.role === 'admin') return settings?.admins_can_view_user_emails !== false
+  return false
 }
 
-export function publicUser(row, { viewer } = {}) {
+function canViewPhone(row, viewer, settings) {
+  if (!viewer) return false
+  if (Number(row.id) === Number(viewer.id)) return true
+  if (viewer.role === 'super_admin') return true
+  if (viewer.role === 'admin') return settings?.admins_can_view_user_phones !== false
+  return false
+}
+
+function isRestrictedAdminContact(row, viewer, allowed) {
+  return viewer?.role === 'admin' && Number(row.id) !== Number(viewer.id) && !allowed
+}
+
+export function publicUser(row, { viewer, settings } = {}) {
   if (!row) return null
   const hideEmail = Boolean(row.hide_email ?? row.privacy_settings?.hide_email)
   const hidePhone = Boolean(row.hide_phone ?? row.privacy_settings?.hide_phone)
-  const revealPrivateContacts = canViewPrivateContacts(row, viewer)
+  const revealEmail = canViewEmail(row, viewer, settings)
+  const revealPhone = canViewPhone(row, viewer, settings)
+  const restrictEmailForAdmin = isRestrictedAdminContact(row, viewer, revealEmail)
+  const restrictPhoneForAdmin = isRestrictedAdminContact(row, viewer, revealPhone)
   const initials = (row.full_name || row.email || 'U')
     .split(' ')
     .filter(Boolean)
@@ -19,8 +35,8 @@ export function publicUser(row, { viewer } = {}) {
 
   return {
     id: row.id,
-    email: hideEmail && !revealPrivateContacts ? null : row.email,
-    phone: hidePhone && !revealPrivateContacts ? null : row.phone,
+    email: restrictEmailForAdmin || (hideEmail && !revealEmail) ? null : row.email,
+    phone: restrictPhoneForAdmin || (hidePhone && !revealPhone) ? null : row.phone,
     name: row.full_name,
     firstName: row.first_name,
     lastName: row.last_name,

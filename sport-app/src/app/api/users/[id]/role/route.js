@@ -4,6 +4,7 @@ import { badRequest, forbidden, notFound } from '@/lib/server/http-error'
 import { publicUser } from '@/lib/mappers/user'
 import { getUserRole } from '@/lib/repositories/users'
 import { json, readJson, route } from '@/lib/server/response'
+import { getSettings } from '@/lib/services/settings'
 
 export const PATCH = route(async (request, context) => {
   const user = await requireAuth(request)
@@ -36,5 +37,5 @@ export const PATCH = route(async (request, context) => {
     data: { role, updated_at: now() },
   })
 
-  return json({ user: publicUser(updated, { viewer: user }) })
+  return json({ user: publicUser(updated, { viewer: user, settings: await getSettings() }) })
 })

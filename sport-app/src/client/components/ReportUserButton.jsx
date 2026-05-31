@@ -17,6 +17,7 @@ export function ReportUserButton({
   currentUserId,
   label = 'Жалоба',
   compact = false,
+  buttonStyle,
   onCreated,
 }) {
   const [open, setOpen] = useState(false)
@@ -56,7 +57,10 @@ export function ReportUserButton({
           event?.stopPropagation?.()
           setOpen(true)
         }}
-        style={compact ? { padding: '6px 10px', fontSize: 12 } : undefined}
+        style={{
+          ...(compact ? { padding: '6px 10px', fontSize: 12 } : {}),
+          ...(buttonStyle || {}),
+        }}
       >
         {label}
       </Btn>

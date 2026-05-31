@@ -624,6 +624,56 @@
   box-shadow: 0 10px 28px rgba(39, 43, 33, 0.06);
 }
 
+.rt-verification-gate {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr) auto;
+  gap: 18px;
+  align-items: center;
+  max-width: 860px;
+}
+
+.rt-verification-gate h2 {
+  margin: 0 0 8px;
+  font-size: 24px;
+}
+
+.rt-verification-gate p {
+  margin: 0;
+  color: var(--rt-muted);
+  line-height: 1.55;
+}
+
+.rt-verification-gate p + p {
+  margin-top: 6px;
+}
+
+.rt-verification-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--rt-soft);
+  color: var(--rt-accent-strong);
+}
+
+.rt-verification-contacts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.rt-verification-contacts span {
+  padding: 7px 10px;
+  border-radius: 999px;
+  background: var(--rt-surface-soft);
+  color: var(--rt-muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .rt-workout-header {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -1647,6 +1697,7 @@
   .rt-card-main,
   .rt-request,
   .rt-review-target,
+  .rt-verification-gate,
   .rt-user-list-item {
     grid-template-columns: 1fr;
   }
@@ -1683,6 +1734,10 @@
 
   .rt-notification-head .rt-secondary {
     width: 100%;
+  }
+
+  .rt-verification-gate {
+    justify-items: start;
   }
 
   .rt-cancel-dialog {

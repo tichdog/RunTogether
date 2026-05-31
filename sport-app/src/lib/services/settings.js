@@ -11,6 +11,8 @@ const DEFAULTS = {
   workout_archive_retention_days: 90,
   review_window_days: 7,
   notification_retention_days: 30,
+  admins_can_view_user_emails: true,
+  admins_can_view_user_phones: true,
 }
 
 const SETTINGS_CACHE_TTL_MS = 60_000
