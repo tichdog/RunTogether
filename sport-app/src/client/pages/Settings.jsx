@@ -103,6 +103,24 @@ export function Settings({ currentUser }) {
           />
         </Card>
 
+        {isSuperAdmin && (
+          <Card>
+            <div style={sectionHeader}>Доступ администраторов к контактам</div>
+            <Toggle
+              label="Обычные админы видят почты пользователей"
+              sub="Супер-админы видят почты всегда"
+              value={Boolean(settings.admins_can_view_user_emails)}
+              onChange={set('admins_can_view_user_emails')}
+            />
+            <Toggle
+              label="Обычные админы видят телефоны пользователей"
+              sub="Супер-админы видят телефоны всегда"
+              value={Boolean(settings.admins_can_view_user_phones)}
+              onChange={set('admins_can_view_user_phones')}
+            />
+          </Card>
+        )}
+
         <Card>
           <div style={sectionHeader}>Лимиты</div>
           <label style={numberRow}>

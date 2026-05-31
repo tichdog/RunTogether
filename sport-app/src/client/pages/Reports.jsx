@@ -308,9 +308,19 @@ function ReportCard({ report, decision, saving, onDecision, onModerate, onSelect
                   value={decision.banDays}
                   onChange={(event) => onDecision({ banDays: event.target.value })}
                   disabled={decision.banMode === 'permanent'}
-                  min={1}
-                  max={3650}
+                  min={0}
+                  max={INPUT_LIMITS.banMaxDays}
                 />
+                <div
+                  style={{
+                    gridColumn: '1 / -1',
+                    color: T.textHint,
+                    fontSize: 12,
+                    lineHeight: 1.35,
+                  }}
+                >
+                  0 — навсегда, максимум {INPUT_LIMITS.banMaxDays} дней.
+                </div>
               </div>
             )}
             <textarea

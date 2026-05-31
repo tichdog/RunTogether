@@ -88,6 +88,7 @@ export const POST = route(async (request) => {
         last_name: lastName,
         gender,
         full_name: fullName,
+        privacy_settings: { hide_email: true, hide_phone: true },
       },
     })
 

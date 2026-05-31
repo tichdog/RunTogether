@@ -94,6 +94,11 @@ export function UserDetail({ user, currentAdmin, onBack, onChanged, onDeleted })
   const canChangeRole = !isSelf && (!targetIsAdmin || canManageTargetAdmin)
   const canChangeAvatar = isSelf || !targetIsAdmin || canManageTargetAdmin
   const isBlocked = current.status === 'blocked'
+  const blockedUntil = current.moderation?.blockedUntil
+  const blockUntilText = blockedUntil
+    ? new Date(blockedUntil).toLocaleDateString('ru-RU')
+    : 'Навсегда'
+  const blockReason = current.moderation?.blockReason || 'Причина не указана'
 
   const statCards = [
     ['Проведено', current.stats?.organizedWorkouts || 0, T.accent],
@@ -135,49 +140,111 @@ export function UserDetail({ user, currentAdmin, onBack, onChanged, onDeleted })
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
           <Card>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20 }}>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '56px minmax(0, 1fr)',
+                alignItems: 'start',
+                gap: 14,
+                marginBottom: 20,
+              }}
+            >
               <Avatar initials={current.initials} src={current.avatarUrl} size={48} />
-              <div>
-                <div style={{ fontSize: 18, fontWeight: 800, color: T.text }}>{current.name}</div>
-                <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+              <div style={{ minWidth: 0 }}>
+                <div
+                  style={{
+                    fontSize: 18,
+                    fontWeight: 800,
+                    color: T.text,
+                    lineHeight: 1.25,
+                    overflowWrap: 'anywhere',
+                  }}
+                >
+                  {current.name}
+                </div>
+                <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
                   <Badge text={ROLE_LABELS[current.role]} colors={ROLE_COLORS[current.role]} />
                   <StatusBadge status={current.status} />
                 </div>
-                <div style={{ marginTop: 10 }}>
-                  <ReportUserButton user={current} currentUserId={currentAdmin?.id} />
-                </div>
-                <label
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    marginTop: 10,
-                    padding: '7px 11px',
-                    border: `1px solid ${T.border}`,
-                    borderRadius: T.radiusSm,
-                    color: canChangeAvatar ? T.text : T.textHint,
-                    fontSize: 12,
-                    fontWeight: 700,
-                    cursor: canChangeAvatar ? 'pointer' : 'default',
-                    opacity: canChangeAvatar ? 1 : 0.55,
-                  }}
-                >
-                  <input
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp,image/gif"
-                    onChange={saveAvatar}
-                    disabled={!canChangeAvatar || avatarSaving}
-                    style={{
-                      position: 'absolute',
-                      width: 1,
-                      height: 1,
-                      overflow: 'hidden',
-                      clip: 'rect(0 0 0 0)',
-                    }}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
+                  <ReportUserButton
+                    user={current}
+                    currentUserId={currentAdmin?.id}
+                    buttonStyle={{ margin: 0 }}
                   />
-                  {avatarSaving ? 'Загрузка...' : 'Загрузить аватарку'}
-                </label>
+                  <label
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      minHeight: 36,
+                      padding: '0 12px',
+                      border: `1px solid ${T.border}`,
+                      borderRadius: T.radiusSm,
+                      color: canChangeAvatar ? T.text : T.textHint,
+                      fontSize: 12,
+                      fontWeight: 700,
+                      cursor: canChangeAvatar ? 'pointer' : 'default',
+                      opacity: canChangeAvatar ? 1 : 0.55,
+                    }}
+                  >
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,image/gif"
+                      onChange={saveAvatar}
+                      disabled={!canChangeAvatar || avatarSaving}
+                      style={{
+                        position: 'absolute',
+                        width: 1,
+                        height: 1,
+                        overflow: 'hidden',
+                        clip: 'rect(0 0 0 0)',
+                      }}
+                    />
+                    {avatarSaving ? 'Загрузка...' : 'Загрузить аватарку'}
+                  </label>
+                </div>
               </div>
             </div>
+
+            {isBlocked && (
+              <div
+                style={{
+                  border: '1px solid #FECACA',
+                  borderRadius: T.radiusSm,
+                  background: T.dangerLight,
+                  padding: '12px 14px',
+                  marginBottom: 18,
+                }}
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    gap: 12,
+                    flexWrap: 'wrap',
+                    alignItems: 'center',
+                    marginBottom: 8,
+                  }}
+                >
+                  <span style={{ color: T.danger, fontSize: 12, fontWeight: 800 }}>
+                    Блокировка
+                  </span>
+                  <strong style={{ color: T.danger, fontSize: 13 }}>До: {blockUntilText}</strong>
+                </div>
+                <div
+                  style={{
+                    color: T.text,
+                    fontSize: 12,
+                    lineHeight: 1.45,
+                    overflowWrap: 'anywhere',
+                  }}
+                >
+                  <span style={{ color: T.textMuted }}>Причина: </span>
+                  {blockReason}
+                </div>
+              </div>
+            )}
 
             {[
               ['ID', current.id],

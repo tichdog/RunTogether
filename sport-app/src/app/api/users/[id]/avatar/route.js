@@ -4,6 +4,7 @@ import { badRequest, forbidden, notFound } from '@/lib/server/http-error'
 import { publicUser } from '@/lib/mappers/user'
 import { getUserProfile, getUserRole } from '@/lib/repositories/users'
 import { json, route } from '@/lib/server/response'
+import { getSettings } from '@/lib/services/settings'
 import { saveImageUpload } from '@/lib/server/uploads'
 
 export const POST = route(async (request, context) => {
@@ -29,5 +30,5 @@ export const POST = route(async (request, context) => {
   if (!updated) throw badRequest('Аватар не удалось сохранить')
 
   const profile = await getUserProfile(id)
-  return json({ user: publicUser(profile, { viewer: user }) })
+  return json({ user: publicUser(profile, { viewer: user, settings: await getSettings() }) })
 })

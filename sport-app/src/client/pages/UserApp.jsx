@@ -2489,8 +2489,8 @@ function profileFromUser(user) {
     lastName: user.lastName || '',
     gender: ['male', 'female'].includes(user.gender) ? user.gender : 'male',
     phone: user.phone || '',
-    hideEmail: Boolean(user.privacy?.hide_email),
-    hidePhone: Boolean(user.privacy?.hide_phone),
+    hideEmail: user.privacy?.hide_email !== false,
+    hidePhone: user.privacy?.hide_phone !== false,
   }
 }
 

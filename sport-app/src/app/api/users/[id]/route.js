@@ -4,6 +4,7 @@ import { badRequest, forbidden, notFound } from '@/lib/server/http-error'
 import { publicUser } from '@/lib/mappers/user'
 import { getUserProfile, getUserRole } from '@/lib/repositories/users'
 import { json, noContent, route } from '@/lib/server/response'
+import { getSettings } from '@/lib/services/settings'
 
 export const GET = route(async (request, context) => {
   const user = await requireAuth(request)
@@ -15,7 +16,7 @@ export const GET = route(async (request, context) => {
     throw notFound('Пользователь не найден')
   }
 
-  return json({ user: publicUser(profile, { viewer: user }) })
+  return json({ user: publicUser(profile, { viewer: user, settings: await getSettings() }) })
 })
 
 export const DELETE = route(async (request, context) => {
