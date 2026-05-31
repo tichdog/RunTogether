@@ -1,4 +1,4 @@
-import { dbId, prisma } from '../server/db'
+import { dbId, now, prisma } from '../server/db'
 
 const COMPLETED_WORKOUT_STATUSES = ['completed', 'archived']
 
@@ -150,5 +150,23 @@ export async function getUserRole(id, client = prisma) {
   return client.users.findUnique({
     where: { id: dbId(id) },
     select: { id: true, role: true },
+  })
+}
+
+export async function replaceUserAvatar(id, avatarUrl) {
+  return prisma.$transaction(async (tx) => {
+    const [lockedUser] = await tx.$queryRaw`
+      select avatar_url
+      from users
+      where id = ${dbId(id)}
+      for update
+    `
+
+    await tx.users.update({
+      where: { id: dbId(id) },
+      data: { avatar_url: avatarUrl, updated_at: now() },
+    })
+
+    return lockedUser?.avatar_url
   })
 }

@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "next dev --webpack -p 4000",
+    "dev:local": "next dev --webpack -H 127.0.0.1 -p 4000",
+    "dev:local:4001": "next dev --webpack -H 127.0.0.1 -p 4001",
     "dev:logs": "next dev --webpack -p 4000 | pino-pretty --translateTime SYS:standard --ignore pid,hostname",
     "postinstall": "prisma generate",
     "db:up": "docker compose --profile database up -d postgres",
@@ -22,8 +24,8 @@
     "prisma:generate": "prisma generate",
     "db:pull": "prisma db pull",
     "db:studio": "prisma studio",
-    "db:schema": "prisma db execute --file src/db/schema.sql --schema prisma/schema.prisma",
-    "db:seed": "prisma db execute --file src/db/seed.sql --schema prisma/schema.prisma",
+    "db:schema": "prisma db execute --file src/db/schema.sql",
+    "db:seed": "prisma db execute --file src/db/seed.sql",
     "check": "next build"
   },
   "dependencies": {
