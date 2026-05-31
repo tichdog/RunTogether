@@ -1,5 +1,6 @@
 import '@/client/index.css'
 import '@/client/styles/auth.css'
+import 'react-phone-number-input/style.css'
 import '@/client/styles/user-app.css'
 
 export const metadata = {
@@ -7,8 +8,7 @@ export const metadata = {
   description: 'Collaborative training app',
   icons: {
     icon: [
-      { url: '/favicon.svg', type: 'image/svg+xml' },
-      { url: '/favicon.png', type: 'image/png' },
+      { url: '/favicon.png', type: 'image/png', sizes: 'any' },
     ],
   },
 }

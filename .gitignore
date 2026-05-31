@@ -27,6 +27,8 @@ pnpm-debug.log*
 uploads/
 **/uploads/
 **/public/uploads/
+!sport-app/src/app/uploads/
+!sport-app/src/app/uploads/**
 **/src/generated/prisma/
 tmp/
 temp/

@@ -23,6 +23,12 @@ function requiredSecret(name, fallback, { minLength = 32, reject = [] } = {}) {
   return value
 }
 
+function booleanFromEnv(name, fallback) {
+  const value = process.env[name]
+  if (value == null || value === '') return fallback
+  return ['1', 'true', 'yes', 'on'].includes(value.toLowerCase())
+}
+
 export const env = {
   nodeEnv,
   clientOrigins: (process.env.CLIENT_ORIGIN || 'http://localhost:4000')
@@ -42,6 +48,12 @@ export const env = {
   accessCookieMaxAge: numberFromEnv('ACCESS_COOKIE_MAX_AGE_SECONDS', 15 * 60),
   refreshCookieMaxAge: numberFromEnv('REFRESH_COOKIE_MAX_AGE_SECONDS', 30 * 24 * 60 * 60),
   uploadUrlPath: '/uploads',
+  s3Endpoint: requiredEnv('S3_ENDPOINT', 'http://localhost:9000'),
+  s3Region: process.env.S3_REGION || 'us-east-1',
+  s3Bucket: requiredEnv('S3_BUCKET', 'sport-app'),
+  s3AccessKeyId: requiredEnv('S3_ACCESS_KEY_ID', 'minioadmin'),
+  s3SecretAccessKey: requiredEnv('S3_SECRET_ACCESS_KEY', 'minioadmin'),
+  s3ForcePathStyle: booleanFromEnv('S3_FORCE_PATH_STYLE', true),
   cronSecret: requiredSecret('CRON_SECRET', '', {
     reject: ['', 'change-this-cron-secret'],
   }),

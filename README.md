@@ -191,7 +191,7 @@ npm run db:seed
 - `JWT_SECRET` - секрет для JWT.
 - `CRON_SECRET` - секрет для cron endpoint.
 - `CLIENT_ORIGIN` - адрес приложения, обычно `http://localhost:4000`.
-- `UPLOAD_DIR` - папка для загруженных файлов, по умолчанию `public/uploads`.
+- `S3_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` - MinIO/S3 для аватарок.
 
 Для локальной разработки dummy-ключи Turnstile уже прописаны в `.env.example`.
 
@@ -204,5 +204,5 @@ sport-app/
   src/lib/          серверные сервисы, репозитории, auth, env
   src/db/           SQL schema, seed и миграционные скрипты
   prisma/           Prisma schema
-  public/           статические файлы и uploads
+  public/           статические файлы приложения
 ```

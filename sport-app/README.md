@@ -149,7 +149,8 @@ npm run db:seed
 - `src/lib` - серверные сервисы, репозитории, auth, env, logging.
 - `src/db` - SQL schema, seed и миграционные скрипты.
 - `prisma/schema.prisma` - Prisma schema.
-- `public/uploads` - загруженные файлы.
+- `src/app/uploads/[...segments]` - прокси для аватарок из S3/MinIO.
+- MinIO/S3 - хранилище загруженных аватарок.
 
 ## Логи
 
