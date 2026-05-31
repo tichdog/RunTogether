@@ -118,7 +118,7 @@ async function bodyToBuffer(body) {
   return Buffer.concat(chunks)
 }
 
-export async function saveImageUpload(file) {
+async function saveImageUploadTo(file, folder) {
   if (!file || typeof file.arrayBuffer !== 'function') {
     throw badRequest('Файл не передан')
   }
@@ -135,7 +135,7 @@ export async function saveImageUpload(file) {
   }
 
   await ensureBucket()
-  const key = `avatars/${Date.now()}-${randomUUID()}${extensionFor(file)}`
+  const key = `${folder}/${Date.now()}-${randomUUID()}${extensionFor(file)}`
   await s3.send(
     new PutObjectCommand({
       Bucket: env.s3Bucket,
@@ -146,6 +146,14 @@ export async function saveImageUpload(file) {
   )
 
   return `${env.uploadUrlPath}/${key}`
+}
+
+export async function saveImageUpload(file) {
+  return saveImageUploadTo(file, 'avatars')
+}
+
+export async function saveAchievementIconUpload(file) {
+  return saveImageUploadTo(file, 'achievement-icons')
 }
 
 function uploadKeyFromUrl(uploadUrl) {
@@ -162,7 +170,12 @@ function uploadKeyFromUrl(uploadUrl) {
   if (!pathname.startsWith(prefix)) return null
 
   const key = pathname.slice(prefix.length)
-  if (!key || key.includes('..') || path.isAbsolute(key) || !key.startsWith('avatars/')) {
+  if (
+    !key ||
+    key.includes('..') ||
+    path.isAbsolute(key) ||
+    (!key.startsWith('avatars/') && !key.startsWith('achievement-icons/'))
+  ) {
     return null
   }
 

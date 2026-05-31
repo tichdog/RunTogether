@@ -8,7 +8,7 @@ import { getUserProfile } from '@/lib/repositories/users'
 import { json, readJson, route } from '@/lib/server/response'
 
 const NAME_RE = /^\p{L}{2,15}$/u
-const LAST_NAME_RE = /^\p{L}{2,15}(?:-\p{L}{2,15})?$/u
+const LAST_NAME_RE = /^(?=.{2,20}$)\p{L}{2,20}(?:-\p{L}{2,20})?$/u
 
 function normalizePhone(phone) {
   const value = phone == null ? '' : String(phone).trim()
@@ -32,7 +32,7 @@ export const PATCH = route(async (request) => {
 
   if (!LAST_NAME_RE.test(lastName)) {
     throw badRequest(
-      'Фамилия должна содержать буквы от 2 до 15 символов. Двойная фамилия пишется через дефис'
+      'Фамилия должна содержать буквы от 2 до 20 символов. Двойная фамилия пишется через дефис'
     )
   }
 

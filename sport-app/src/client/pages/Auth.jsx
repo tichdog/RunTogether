@@ -8,7 +8,7 @@ const TURNSTILE_SCRIPT_URL = 'https://challenges.cloudflare.com/turnstile/v0/api
 const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || DEFAULT_TURNSTILE_SITE_KEY
 const TURNSTILE_LOAD_TIMEOUT_MS = 10000
 const NAME_RE = /^\p{L}{2,15}$/u
-const LAST_NAME_RE = /^\p{L}{2,15}(?:-\p{L}{2,15})?$/u
+const LAST_NAME_RE = /^(?=.{2,20}$)\p{L}{2,20}(?:-\p{L}{2,20})?$/u
 const EMAIL_RE = /^[A-Za-z0-9._%+-]{2,64}@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/
 
 let turnstileScriptPromise = null
@@ -190,7 +190,7 @@ export function Auth({ onAuth }) {
           : '',
       lastName:
         form.lastName && !LAST_NAME_RE.test(form.lastName.trim())
-          ? 'Фамилия: буквы от 2 до 15 символов. Двойная фамилия пишется через дефис.'
+          ? 'Фамилия: буквы от 2 до 20 символов. Двойная фамилия пишется через дефис.'
           : '',
       email: form.email && !EMAIL_RE.test(form.email.trim()) ? 'Введите корректный email.' : '',
     }),
