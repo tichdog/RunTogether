@@ -174,6 +174,8 @@ export function UserApp({ user, onLogout }) {
   const [form, setForm] = useState(defaultWorkoutForm)
   const [defaultParticipantLimit, setDefaultParticipantLimit] = useState(10)
   const [workoutCreateMinLeadHours, setWorkoutCreateMinLeadHours] = useState(0)
+  const [requireVerificationToCreateWorkouts, setRequireVerificationToCreateWorkouts] =
+    useState(true)
   const [profile, setProfile] = useState(() => profileFromUser(user))
   const [loading, setLoading] = useState(true)
   const [profileLoading, setProfileLoading] = useState(false)
@@ -380,6 +382,9 @@ export function UserApp({ user, onLogout }) {
         const minLeadHours = Number(data.settings?.workout_create_min_lead_hours)
         const safeMinLeadHours = Number.isFinite(minLeadHours) ? Math.max(0, minLeadHours) : 0
         if (ignore) return
+        setRequireVerificationToCreateWorkouts(
+          Boolean(data.settings?.require_verified_to_create_workouts)
+        )
         if (Number.isFinite(safeMinLeadHours)) {
           setWorkoutCreateMinLeadHours(safeMinLeadHours)
         }
@@ -838,7 +843,21 @@ export function UserApp({ user, onLogout }) {
           />
         )}
 
-        {screen === 'create' && (
+        {screen === 'create' &&
+          mode === 'create' &&
+          requireVerificationToCreateWorkouts &&
+          !currentUser.phoneVerified && (
+            <VerificationRequiredScreen
+              phone={currentUser.phone}
+              email={currentUser.email}
+              onProfile={() => goTab('profile')}
+            />
+          )}
+
+        {screen === 'create' &&
+          (mode === 'edit' ||
+            !requireVerificationToCreateWorkouts ||
+            currentUser.phoneVerified) && (
           <WorkoutForm
             mode={mode}
             form={form}
@@ -1656,6 +1675,41 @@ function RatingPicker({ disabled, onChange, value = 0 }) {
         </button>
       ))}
     </div>
+  )
+}
+
+function VerificationRequiredScreen({ phone, email, onProfile }) {
+  const missingPhone = !phone
+  const contactHint = missingPhone
+    ? 'Добавьте и подтвердите телефон в профиле, чтобы получить доступ к созданию тренировок.'
+    : 'Подтвердите телефон в профиле, чтобы получить доступ к созданию тренировок.'
+
+  return (
+    <section className="rt-page">
+      <div className="rt-panel rt-verification-gate">
+        <span className="rt-verification-icon">
+          <Icon name="shield" />
+        </span>
+        <div>
+          <h2>Пройдите верификацию</h2>
+          <p>
+            Создание тренировок доступно только пользователям с подтвержденным телефоном. Форма
+            появится сразу после подтверждения.
+          </p>
+          <p>{contactHint}</p>
+          {(email || phone) && (
+            <div className="rt-verification-contacts">
+              {email && <span>{email}</span>}
+              {phone && <span>{phone}</span>}
+            </div>
+          )}
+        </div>
+        <button className="rt-primary" type="button" onClick={onProfile}>
+          <Icon name="user" />
+          Открыть профиль
+        </button>
+      </div>
+    </section>
   )
 }
 
@@ -2701,6 +2755,12 @@ function Icon({ name }) {
       <>
         <path d="M14.5 4l1.4 2H19a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h3.1l1.4-2z" />
         <circle cx="12" cy="13" r="3" />
+      </>
+    ),
+    shield: (
+      <>
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+        <path d="M9 12l2 2 4-4" />
       </>
     ),
   }

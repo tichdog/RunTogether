@@ -53,6 +53,12 @@ npm run dev
 - API: http://localhost:4000/api
 - healthcheck: http://localhost:4000/health
 
+## Cron задачи
+Сейчас выполняют очистку уведомлений старше N дней (настройка в панели админа)  
+```powershell
+npm run cron:loop
+```
+
 ## Grafana, Loki, Promtail
 
 Само приложение запускается локально, а инфраструктура логов запускается в Docker.
