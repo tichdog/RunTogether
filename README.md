@@ -46,14 +46,14 @@ psql -U postgres -c "CREATE DATABASE sport_training;"
 npm install
 ```
 
-Примени схему и seed-данные:
+Применить схему и seed-данные:
 
 ```powershell
 npm run db:schema
 npm run db:seed
 ```
 
-Запусти приложение:
+Запустить приложение:
 
 ```powershell
 npm run dev
@@ -65,7 +65,7 @@ npm run dev
 - API: http://localhost:4000/api
 - healthcheck: http://localhost:4000/health
 
-## Логи, Grafana и Loki
+## Логи, Grafana, Loki, S3 (MinIO)
 
 Приложение пишет Pino-логи в консоль и в файл:
 
@@ -83,12 +83,20 @@ docker compose up -d
 
 - Grafana: http://localhost:3001
 - Loki: http://localhost:3100
+- MinIO http://localhost:9001
 
 Вход в Grafana:
 
 ```text
 Login: admin
 Password: admin
+```
+
+Вход в MinIO:
+
+```text
+Login: minioadmin
+Password: minioadmin
 ```
 
 Promtail читает локальные файлы из `sport-app/logs/*.log` и отправляет их в Loki. В Grafana открой **Explore**, выбери **Loki** и выполни запрос:
@@ -104,12 +112,6 @@ Promtail читает локальные файлы из `sport-app/logs/*.log` 
 ```
 
 Готовый dashboard лежит в Grafana в разделе **Dashboards** -> **Sport App** -> **Sport App Logs**.
-
-Остановить observability-контейнеры:
-
-```powershell
-docker compose down
-```
 
 ## Тестовый вход
 
