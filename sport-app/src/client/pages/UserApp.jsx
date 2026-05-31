@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import PhoneInput, { isValidPhoneNumber } from 'react-phone-number-input'
 import { api } from '../api/client'
 import { ReportUserButton } from '../components/ReportUserButton'
 import { INPUT_LIMITS } from '@/lib/input-limits'
@@ -1812,10 +1813,15 @@ function ProfileScreen({
     profile.lastName && !LAST_NAME_RE.test(profile.lastName.trim())
       ? 'Фамилия: буквы от 2 до 15 символов. Двойная фамилия пишется через дефис.'
       : ''
+  const phoneError =
+    profile.phone && !isValidPhoneNumber(profile.phone)
+      ? 'Укажите корректный номер с кодом страны.'
+      : ''
   const profileIsValid =
     NAME_RE.test(profile.firstName.trim()) &&
     LAST_NAME_RE.test(profile.lastName.trim()) &&
-    ['male', 'female'].includes(profile.gender)
+    ['male', 'female'].includes(profile.gender) &&
+    !phoneError
 
   return (
     <section className="rt-page rt-profile-page">
@@ -1879,12 +1885,20 @@ function ProfileScreen({
         </label>
         <label>
           <span>Телефон</span>
-          <input
-            value={profile.phone}
-            onChange={set('phone')}
-            placeholder="+7..."
+          <PhoneInput
+            className="rt-phone-input"
+            value={profile.phone || undefined}
+            onChange={(value) => setProfile((prev) => ({ ...prev, phone: value || '' }))}
+            defaultCountry="RU"
+            international
+            countryCallingCodeEditable={false}
+            placeholder="+7 999 000-11-22"
+            limitMaxLength
             maxLength={INPUT_LIMITS.phone}
           />
+          <small className={`rt-field-hint ${phoneError ? 'error' : 'empty'}`}>
+            {phoneError || ' '}
+          </small>
         </label>
         <label className="rt-checkbox wide">
           <input type="checkbox" checked={profile.hideEmail} onChange={set('hideEmail')} />

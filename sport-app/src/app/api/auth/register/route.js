@@ -1,4 +1,5 @@
 import bcrypt from 'bcryptjs'
+import { isValidPhoneNumber } from 'libphonenumber-js/min'
 import { INPUT_LIMITS } from '@/lib/input-limits'
 import { prisma } from '@/lib/server/db'
 import { badRequest, HttpError } from '@/lib/server/http-error'
@@ -49,7 +50,7 @@ export const POST = route(async (request) => {
   if (!email || email.length > INPUT_LIMITS.email || !EMAIL_RE.test(email)) {
     throw badRequest('Некорректный email')
   }
-  if (phone && phone.length > INPUT_LIMITS.phone) {
+  if (phone && (phone.length > INPUT_LIMITS.phone || !isValidPhoneNumber(phone))) {
     throw badRequest('Некорректный телефон')
   }
   if (!['male', 'female'].includes(gender)) {

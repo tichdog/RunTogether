@@ -1,5 +1,6 @@
 import '@/client/index.css'
 import '@/client/styles/auth.css'
+import 'react-phone-number-input/style.css'
 import '@/client/styles/user-app.css'
 
 export const metadata = {
