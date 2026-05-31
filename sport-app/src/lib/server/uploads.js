@@ -2,6 +2,7 @@ import path from 'node:path'
 import { randomUUID } from 'node:crypto'
 import {
   CreateBucketCommand,
+  DeleteObjectCommand,
   GetObjectCommand,
   HeadBucketCommand,
   PutObjectCommand,
@@ -9,6 +10,7 @@ import {
 } from '@aws-sdk/client-s3'
 import { env } from './env'
 import { badRequest, notFound } from './http-error'
+import { logger } from './logger'
 
 const IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif'])
 
@@ -144,6 +146,44 @@ export async function saveImageUpload(file) {
   )
 
   return `${env.uploadUrlPath}/${key}`
+}
+
+function uploadKeyFromUrl(uploadUrl) {
+  if (!uploadUrl || typeof uploadUrl !== 'string') return null
+
+  let pathname = uploadUrl
+  try {
+    pathname = new URL(uploadUrl).pathname
+  } catch {
+    pathname = uploadUrl
+  }
+
+  const prefix = `${env.uploadUrlPath}/`
+  if (!pathname.startsWith(prefix)) return null
+
+  const key = pathname.slice(prefix.length)
+  if (!key || key.includes('..') || path.isAbsolute(key) || !key.startsWith('avatars/')) {
+    return null
+  }
+
+  return key
+}
+
+export async function deleteImageUpload(uploadUrl) {
+  const key = uploadKeyFromUrl(uploadUrl)
+  if (!key) return
+
+  try {
+    await ensureBucket()
+    await s3.send(
+      new DeleteObjectCommand({
+        Bucket: env.s3Bucket,
+        Key: key,
+      })
+    )
+  } catch (error) {
+    logger.warn({ err: error, key }, 'Failed to delete image upload')
+  }
 }
 
 export async function readUpload(segments) {

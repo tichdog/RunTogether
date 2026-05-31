@@ -1,11 +1,10 @@
 import { requireAdmin, requireAuth, isAdmin } from '@/lib/server/auth'
-import { dbId, now, prisma } from '@/lib/server/db'
-import { badRequest, forbidden, notFound } from '@/lib/server/http-error'
+import { forbidden, notFound } from '@/lib/server/http-error'
 import { publicUser } from '@/lib/mappers/user'
-import { getUserProfile, getUserRole } from '@/lib/repositories/users'
+import { getUserProfile, getUserRole, replaceUserAvatar } from '@/lib/repositories/users'
 import { json, route } from '@/lib/server/response'
 import { getSettings } from '@/lib/services/settings'
-import { saveImageUpload } from '@/lib/server/uploads'
+import { deleteImageUpload, saveImageUpload } from '@/lib/server/uploads'
 
 export const POST = route(async (request, context) => {
   const user = await requireAuth(request)
@@ -22,12 +21,17 @@ export const POST = route(async (request, context) => {
   const form = await request.formData()
   const avatarUrl = await saveImageUpload(form.get('avatar'))
 
-  const updated = await prisma.users.update({
-    where: { id: dbId(id) },
-    data: { avatar_url: avatarUrl, updated_at: now() },
-  })
+  let previousAvatarUrl
+  try {
+    previousAvatarUrl = await replaceUserAvatar(id, avatarUrl)
+  } catch (error) {
+    await deleteImageUpload(avatarUrl)
+    throw error
+  }
 
-  if (!updated) throw badRequest('Аватар не удалось сохранить')
+  if (previousAvatarUrl && previousAvatarUrl !== avatarUrl) {
+    await deleteImageUpload(previousAvatarUrl)
+  }
 
   const profile = await getUserProfile(id)
   return json({ user: publicUser(profile, { viewer: user, settings: await getSettings() }) })
