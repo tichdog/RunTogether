@@ -22,8 +22,8 @@
     "prisma:generate": "prisma generate",
     "db:pull": "prisma db pull",
     "db:studio": "prisma studio",
-    "db:schema": "prisma db execute --file src/db/schema.sql --schema prisma/schema.prisma",
-    "db:seed": "prisma db execute --file src/db/seed.sql --schema prisma/schema.prisma",
+    "db:schema": "prisma db execute --file src/db/schema.sql",
+    "db:seed": "prisma db execute --file src/db/seed.sql",
     "check": "next build"
   },
   "dependencies": {
