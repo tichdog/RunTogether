@@ -7,7 +7,7 @@ import { workoutInclude, buildWorkoutRows } from '../services/workouts'
 
 const WORKOUT_LIMITS = {
   durationMinutes: { min: 15, max: 1440 },
-  distanceKm: { min: 0.1, max: 99999.99 },
+  distanceKm: { min: 0.1, max: 250 },
   paceMinPerKm: { min: 0.1, max: 99.99 },
   participantLimit: { min: 1, max: 200 },
 }
@@ -42,16 +42,15 @@ export function parseWorkoutBody(body) {
   const durationMinutes = Number(body.durationMinutes ?? body.duration_minutes ?? 60)
   const participantLimit = Number(body.participantLimit ?? body.participant_limit)
   const distanceKm = Number(body.distanceKm ?? body.distance_km)
-  const paceMinPerKm = Number(body.paceMinPerKm ?? body.pace_min_per_km)
+  const paceMinPerKm = calculatePaceMinPerKm(durationMinutes, distanceKm)
 
   if (
     !startAt ||
     !participantLimit ||
-    !distanceKm ||
-    !paceMinPerKm
+    !distanceKm
   ) {
     throw badRequest(
-      'Заполните дату, точку сбора, маршрут, темп, дистанцию, сложность и лимит участников'
+      'Заполните дату, точку сбора, маршрут, дистанцию, сложность и лимит участников'
     )
   }
   if (!['easy', 'medium', 'hard'].includes(difficulty)) {
@@ -99,6 +98,14 @@ function assertNumberInRange(value, limits, label) {
   if (!Number.isFinite(value) || value < limits.min || value > limits.max) {
     throw badRequest(`${label}: укажите число от ${limits.min} до ${limits.max}`)
   }
+}
+
+function calculatePaceMinPerKm(durationMinutes, distanceKm) {
+  if (!Number.isFinite(durationMinutes) || !Number.isFinite(distanceKm) || distanceKm <= 0) {
+    return Number.NaN
+  }
+
+  return Math.round((durationMinutes / distanceKm) * 100) / 100
 }
 
 export async function getWorkoutRow(client = prisma, workoutId) {
