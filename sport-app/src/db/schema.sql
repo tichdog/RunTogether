@@ -68,7 +68,7 @@ create table if not exists workouts (
   meeting_lng numeric(9,6),
   route_name text not null,
   route_geojson jsonb,
-  distance_km numeric(7,2) not null check (distance_km > 0),
+  distance_km numeric(7,2) not null check (distance_km > 0 and distance_km <= 250),
   pace_min_per_km numeric(4,2) not null check (pace_min_per_km > 0),
   difficulty text not null check (difficulty in ('easy', 'medium', 'hard')),
   participant_limit integer not null check (participant_limit > 0),

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import PhoneInput, { isValidPhoneNumber } from 'react-phone-number-input'
 import { api } from '../api/client'
 import { ReportUserButton } from '../components/ReportUserButton'
+import { preservingScroll, setIfChanged } from '../scroll-stability'
 import { INPUT_LIMITS } from '@/lib/input-limits'
 
 const EMPTY_FILTERS = {
@@ -13,6 +14,14 @@ const EMPTY_FILTERS = {
 
 const NAME_RE = /^\p{L}{2,15}$/u
 const LAST_NAME_RE = /^(?=.{2,20}$)\p{L}{2,20}(?:-\p{L}{2,20})?$/u
+
+const WORKOUT_NUMBER_LIMITS = {
+  durationMinutes: { label: 'Длительность', min: 15, max: 1440, integer: true },
+  distanceKm: { label: 'Дистанция', min: 0.1, max: 250 },
+  participantLimit: { label: 'Лимит участников', min: 1, max: 200, integer: true },
+}
+
+const PACE_LIMITS = { min: 0.1, max: 99.99 }
 
 const USER_TAB_PATHS = {
   home: '/me',
@@ -156,7 +165,6 @@ function defaultWorkoutForm(participantLimit = 10, minLeadHours = 0) {
     meetingAddress: '',
     routeName: '',
     distanceKm: 5,
-    paceMinPerKm: 6,
     difficulty: 'easy',
     participantLimit,
   }
@@ -194,9 +202,9 @@ export function UserApp({ user, onLogout }) {
   const refreshCurrentUser = useCallback(async ({ syncProfileForm = false } = {}) => {
     const data = await api.me()
     if (!data.user) return null
-    setCurrentUser(data.user)
+    setIfChanged(setCurrentUser, data.user)
     if (syncProfileForm) {
-      setProfile(profileFromUser(data.user))
+      setIfChanged(setProfile, profileFromUser(data.user))
     }
     return data.user
   }, [])
@@ -259,9 +267,9 @@ export function UserApp({ user, onLogout }) {
   const loadNotifications = useCallback(async () => {
     try {
       const data = await api.notifications()
-      setNotifications(data.notifications || [])
+      setIfChanged(setNotifications, data.notifications || [])
     } catch {
-      setNotifications([])
+      // Keep the current notifications on transient polling errors to avoid a visual flash.
     }
   }, [])
 
@@ -277,9 +285,11 @@ export function UserApp({ user, onLogout }) {
           sort: filters.sort,
           archiveOnly: filters.view === 'archive' || undefined,
         })
-        setWorkouts(data.workouts || [])
-        refreshCurrentUser().catch(() => {})
-        loadNotifications()
+        setIfChanged(setWorkouts, data.workouts || [])
+        await Promise.all([
+          refreshCurrentUser().catch(() => {}),
+          loadNotifications().catch(() => {}),
+        ])
       } catch (error) {
         if (!silent) setMessage({ type: 'error', text: error.message })
       } finally {
@@ -296,7 +306,7 @@ export function UserApp({ user, onLogout }) {
   useEffect(() => {
     const refresh = () => {
       if (document.visibilityState === 'visible') {
-        loadWorkouts({ silent: true })
+        preservingScroll(() => loadWorkouts({ silent: true }))
       }
     }
     const timer = window.setInterval(refresh, 15000)
@@ -805,6 +815,8 @@ export function UserApp({ user, onLogout }) {
         {screen === 'organized' && (
           <OrganizedWorkoutsScreen
             workouts={organizedWorkouts}
+            filters={filters}
+            setFilters={setFilters}
             loading={loading}
             onOpen={(workout) => navigate(`/organized/${workout.id}`)}
             onCreate={() => goTab('create')}
@@ -1160,10 +1172,11 @@ function WorkoutsScreen({
   )
 }
 
-function OrganizedWorkoutsScreen({ workouts, loading, onOpen, onCreate }) {
+function OrganizedWorkoutsScreen({ workouts, filters, setFilters, loading, onOpen, onCreate }) {
   const activeCount = workouts.filter(
     (workout) => !['completed', 'cancelled'].includes(workout.status)
   ).length
+  const isArchive = filters.view === 'archive'
 
   return (
     <section className="rt-page">
@@ -1171,13 +1184,35 @@ function OrganizedWorkoutsScreen({ workouts, loading, onOpen, onCreate }) {
         <SectionHead
           title="Организую"
           caption={
-            loading ? 'Загружаем...' : `${workouts.length} создано · ${activeCount} активных`
+            loading
+              ? 'Загружаем...'
+              : isArchive
+                ? `${workouts.length} в архиве`
+                : `${workouts.length} создано · ${activeCount} активных`
           }
         />
-        <button className="rt-primary" type="button" onClick={onCreate}>
-          <Icon name="plus" />
-          Создать тренировку
-        </button>
+        <div className="rt-page-head-actions">
+          <div className="rt-view-toggle" aria-label="Фильтр архива организованных тренировок">
+            <button
+              className={!isArchive ? 'active' : ''}
+              type="button"
+              onClick={() => setFilters((prev) => ({ ...prev, view: 'active' }))}
+            >
+              Активные
+            </button>
+            <button
+              className={isArchive ? 'active' : ''}
+              type="button"
+              onClick={() => setFilters((prev) => ({ ...prev, view: 'archive' }))}
+            >
+              Архив
+            </button>
+          </div>
+          <button className="rt-primary" type="button" onClick={onCreate}>
+            <Icon name="plus" />
+            Создать тренировку
+          </button>
+        </div>
       </div>
       <WorkoutList workouts={workouts} onOpen={onOpen} empty="Вы пока не организовали тренировок" />
     </section>
@@ -1714,121 +1749,191 @@ function VerificationRequiredScreen({ phone, email, onProfile }) {
 }
 
 function WorkoutForm({ mode, form, setForm, saving, minLeadHours = 0, onSubmit }) {
-  const set = (key) => (event) => setForm((prev) => ({ ...prev, [key]: event.target.value }))
+  const [touched, setTouched] = useState({})
   const now = new Date()
+  const errors = validateWorkoutForm(form, { minLeadHours, now })
+  const derivedPace = calculatePaceMinPerKm(form.durationMinutes, form.distanceKm)
+  const paceText = Number.isFinite(derivedPace) ? derivedPace.toFixed(2) : ''
+  const fieldError = (key) => {
+    if (key === 'paceMinPerKm' && (touched.durationMinutes || touched.distanceKm)) {
+      return errors[key]
+    }
+    return touched[key] ? errors[key] : ''
+  }
+  const set = (key) => (event) => {
+    const { value } = event.target
+    setTouched((prev) => ({ ...prev, [key]: true }))
+    setForm((prev) => ({ ...prev, [key]: value }))
+  }
+  const markTouched = (key) => () => setTouched((prev) => ({ ...prev, [key]: true }))
+  const showError = (key) => {
+    const error = fieldError(key)
+    return <small className={`rt-field-hint ${error ? 'error' : 'empty'}`}>{error || ' '}</small>
+  }
+  const handleSubmit = (event) => {
+    const nextErrors = validateWorkoutForm(form, { minLeadHours, now: new Date() })
+    const invalidFields = Object.entries(nextErrors)
+      .filter(([, error]) => Boolean(error))
+      .map(([key]) => key)
+
+    if (invalidFields.length) {
+      event.preventDefault()
+      setTouched((prev) => ({
+        ...prev,
+        ...Object.fromEntries(invalidFields.map((key) => [key, true])),
+      }))
+      return
+    }
+
+    onSubmit(event)
+  }
   const minStartAt = toLocalInputValue(new Date(now.getTime() + minLeadHours * 60 * 60 * 1000))
 
   return (
     <section className="rt-page">
-      <form className="rt-form rt-panel" onSubmit={onSubmit}>
+      <form className="rt-form rt-panel" onSubmit={handleSubmit} noValidate>
         <label className="wide">
           <span>Название</span>
           <input
             value={form.title}
             onChange={set('title')}
+            onBlur={markTouched('title')}
+            aria-invalid={Boolean(fieldError('title'))}
             maxLength={INPUT_LIMITS.workoutTitle}
             required
           />
+          {showError('title')}
         </label>
         <label>
           <span>Дата и время</span>
           <input
             value={form.startAt}
             onChange={set('startAt')}
+            onBlur={markTouched('startAt')}
+            aria-invalid={Boolean(fieldError('startAt'))}
             type="datetime-local"
             min={minStartAt}
             required
           />
+          {showError('startAt')}
         </label>
         <label>
           <span>Длительность, мин</span>
           <input
             value={form.durationMinutes}
             onChange={set('durationMinutes')}
+            onBlur={markTouched('durationMinutes')}
+            aria-invalid={Boolean(fieldError('durationMinutes'))}
             type="number"
             min="15"
             max="1440"
             step="5"
             required
           />
+          {showError('durationMinutes')}
         </label>
         <label>
           <span>Сложность</span>
-          <select value={form.difficulty} onChange={set('difficulty')} required>
+          <select
+            value={form.difficulty}
+            onChange={set('difficulty')}
+            onBlur={markTouched('difficulty')}
+            aria-invalid={Boolean(fieldError('difficulty'))}
+            required
+          >
             <option value="easy">Легкая</option>
             <option value="medium">Средняя</option>
             <option value="hard">Сложная</option>
           </select>
+          {showError('difficulty')}
         </label>
         <label>
           <span>Точка сбора</span>
           <input
             value={form.meetingName}
             onChange={set('meetingName')}
+            onBlur={markTouched('meetingName')}
+            aria-invalid={Boolean(fieldError('meetingName'))}
             maxLength={INPUT_LIMITS.workoutMeetingName}
             required
           />
+          {showError('meetingName')}
         </label>
         <label>
           <span>Адрес</span>
           <input
             value={form.meetingAddress}
             onChange={set('meetingAddress')}
+            onBlur={markTouched('meetingAddress')}
+            aria-invalid={Boolean(fieldError('meetingAddress'))}
             maxLength={INPUT_LIMITS.workoutMeetingAddress}
           />
+          {showError('meetingAddress')}
         </label>
         <label>
           <span>Маршрут</span>
           <input
             value={form.routeName}
             onChange={set('routeName')}
+            onBlur={markTouched('routeName')}
+            aria-invalid={Boolean(fieldError('routeName'))}
             maxLength={INPUT_LIMITS.workoutRouteName}
             required
           />
+          {showError('routeName')}
         </label>
         <label>
           <span>Дистанция, км</span>
           <input
             value={form.distanceKm}
             onChange={set('distanceKm')}
+            onBlur={markTouched('distanceKm')}
+            aria-invalid={Boolean(fieldError('distanceKm'))}
             type="number"
             min="0.1"
-            max="99999.99"
+            max="250"
             step="0.01"
             required
           />
+          {showError('distanceKm')}
         </label>
         <label>
           <span>Темп, мин/км</span>
           <input
-            value={form.paceMinPerKm}
-            onChange={set('paceMinPerKm')}
-            type="number"
-            min="0.1"
-            max="99.99"
-            step="0.01"
-            required
+            value={paceText}
+            type="text"
+            readOnly
+            aria-invalid={Boolean(errors.paceMinPerKm)}
+            placeholder="Автоматически"
           />
+          {showError('paceMinPerKm')}
         </label>
         <label>
           <span>Лимит участников</span>
           <input
             value={form.participantLimit}
             onChange={set('participantLimit')}
+            onBlur={markTouched('participantLimit')}
+            aria-invalid={Boolean(fieldError('participantLimit'))}
             type="number"
             min="1"
             max="200"
+            step="1"
             required
           />
+          {showError('participantLimit')}
         </label>
         <label className="wide">
           <span>Комментарий</span>
           <textarea
             value={form.description}
             onChange={set('description')}
+            onBlur={markTouched('description')}
+            aria-invalid={Boolean(fieldError('description'))}
             rows={4}
             maxLength={INPUT_LIMITS.workoutDescription}
           />
+          {showError('description')}
         </label>
         <div className="rt-form-actions wide">
           <button className="rt-primary" type="submit" disabled={saving}>
@@ -2448,7 +2553,107 @@ function AchievementsPanel({ achievements = [] }) {
   )
 }
 
+function validateWorkoutForm(form, { minLeadHours = 0, now = new Date() } = {}) {
+  const errors = {}
+  const checkRequiredText = (key, label, maxLength) => {
+    const value = String(form[key] ?? '')
+    const text = value.trim()
+
+    if (!text) {
+      errors[key] = `${label}: заполните поле`
+      return
+    }
+
+    if (text.length > maxLength) {
+      errors[key] = `${label}: не больше ${maxLength} символов`
+    }
+  }
+  const checkOptionalText = (key, label, maxLength) => {
+    const text = String(form[key] ?? '').trim()
+    if (text.length > maxLength) {
+      errors[key] = `${label}: не больше ${maxLength} символов`
+    }
+  }
+  const checkNumber = (key) => {
+    const limits = WORKOUT_NUMBER_LIMITS[key]
+    const rawValue = String(form[key] ?? '').trim()
+    const value = Number(rawValue)
+
+    if (!rawValue) {
+      errors[key] = `${limits.label}: укажите число от ${limits.min} до ${limits.max}`
+      return
+    }
+
+    if (!Number.isFinite(value) || value < limits.min || value > limits.max) {
+      errors[key] = `${limits.label}: укажите число от ${limits.min} до ${limits.max}`
+      return
+    }
+
+    if (limits.integer && !Number.isInteger(value)) {
+      errors[key] = `${limits.label}: укажите целое число`
+    }
+  }
+
+  checkRequiredText('title', 'Название', INPUT_LIMITS.workoutTitle)
+  checkRequiredText('meetingName', 'Точка сбора', INPUT_LIMITS.workoutMeetingName)
+  checkOptionalText('meetingAddress', 'Адрес', INPUT_LIMITS.workoutMeetingAddress)
+  checkRequiredText('routeName', 'Маршрут', INPUT_LIMITS.workoutRouteName)
+  checkOptionalText('description', 'Комментарий', INPUT_LIMITS.workoutDescription)
+
+  if (!form.startAt) {
+    errors.startAt = 'Дата и время: укажите начало тренировки'
+  } else {
+    const startDate = new Date(form.startAt)
+
+    if (Number.isNaN(startDate.getTime())) {
+      errors.startAt = 'Дата и время: выберите корректную дату'
+    } else if (startDate <= now) {
+      errors.startAt = 'Дата и время: выберите время в будущем'
+    } else {
+      const minLeadMs = Math.max(0, Number(minLeadHours) || 0) * 60 * 60 * 1000
+      const minStartDate = new Date(now.getTime() + minLeadMs)
+      if (minLeadMs > 0 && startDate < minStartDate) {
+        errors.startAt = `Дата и время: минимум за ${formatLeadHours(minLeadHours)} до начала`
+      }
+    }
+  }
+
+  if (!['easy', 'medium', 'hard'].includes(form.difficulty)) {
+    errors.difficulty = 'Сложность: выберите один из вариантов'
+  }
+
+  Object.keys(WORKOUT_NUMBER_LIMITS).forEach(checkNumber)
+
+  if (!errors.durationMinutes && !errors.distanceKm) {
+    const pace = calculatePaceMinPerKm(form.durationMinutes, form.distanceKm)
+    if (!Number.isFinite(pace) || pace < PACE_LIMITS.min || pace > PACE_LIMITS.max) {
+      errors.paceMinPerKm =
+        'Темп получается слишком большим: уменьшите длительность или увеличьте дистанцию'
+    }
+  }
+
+  return errors
+}
+
+function formatLeadHours(value) {
+  const hours = Number(value)
+  return Number.isInteger(hours) ? `${hours} ч.` : `${hours.toFixed(1)} ч.`
+}
+
+function calculatePaceMinPerKm(durationMinutes, distanceKm) {
+  const duration = Number(durationMinutes)
+  const distance = Number(distanceKm)
+
+  if (!Number.isFinite(duration) || !Number.isFinite(distance) || distance <= 0) {
+    return Number.NaN
+  }
+
+  return Math.round((duration / distance) * 100) / 100
+}
+
 function workoutPayload(form) {
+  const paceMinPerKm = calculatePaceMinPerKm(form.durationMinutes, form.distanceKm)
+
   return {
     title: form.title.trim(),
     description: form.description.trim() || null,
@@ -2463,7 +2668,7 @@ function workoutPayload(form) {
       geojson: null,
     },
     distanceKm: Number(form.distanceKm),
-    paceMinPerKm: Number(form.paceMinPerKm),
+    paceMinPerKm,
     difficulty: form.difficulty,
     participantLimit: Number(form.participantLimit),
   }
@@ -2479,7 +2684,6 @@ function formFromWorkout(workout) {
     meetingAddress: workout.meetingPoint?.address || '',
     routeName: workout.route?.name || '',
     distanceKm: workout.distanceKm || 5,
-    paceMinPerKm: workout.paceMinPerKm || 6,
     difficulty: workout.difficulty || 'easy',
     participantLimit: workout.participantLimit || 10,
   }

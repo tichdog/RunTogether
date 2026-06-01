@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { api } from '../api/client'
 import { Avatar, Btn, Card, EmptyState, Input, Select, StatusBadge } from '../components/ui'
 import { ReportUserButton } from '../components/ReportUserButton'
+import { preservingScroll, setIfChanged } from '../scroll-stability'
 import { INPUT_LIMITS } from '@/lib/input-limits'
 import { T } from '../tokens'
 
@@ -13,10 +14,20 @@ function initialForm(participantLimit = 20) {
     meetingAddress: '',
     routeName: '',
     distanceKm: 5,
-    paceMinPerKm: 6,
     difficulty: 'easy',
     participantLimit,
   }
+}
+
+function calculatePaceMinPerKm(durationMinutes, distanceKm) {
+  const duration = Number(durationMinutes)
+  const distance = Number(distanceKm)
+
+  if (!Number.isFinite(duration) || !Number.isFinite(distance) || distance <= 0) {
+    return Number.NaN
+  }
+
+  return Math.round((duration / distance) * 100) / 100
 }
 
 export function Workouts({ selectedWorkoutId, onSelectWorkout, onBackToList, currentUserId }) {
@@ -38,14 +49,18 @@ export function Workouts({ selectedWorkoutId, onSelectWorkout, onBackToList, cur
   const [cancelSaving, setCancelSaving] = useState(false)
 
   const load = useCallback(
-    ({ silent = false } = {}) => {
+    async ({ silent = false } = {}) => {
       if (!silent) setMessage('')
-      api
-        .workouts({ difficulty, sort, includeArchived: showArchive || undefined })
-        .then((data) => setWorkouts(data.workouts || []))
-        .catch((err) => {
-          if (!silent) setMessage(err.message)
+      try {
+        const data = await api.workouts({
+          difficulty,
+          sort,
+          includeArchived: showArchive || undefined,
         })
+        setIfChanged(setWorkouts, data.workouts || [])
+      } catch (err) {
+        if (!silent) setMessage(err.message)
+      }
     },
     [difficulty, showArchive, sort]
   )
@@ -60,11 +75,13 @@ export function Workouts({ selectedWorkoutId, onSelectWorkout, onBackToList, cur
         api.workout(id),
         api.workoutRequests(id),
       ])
-      setSelectedWorkout(workoutData.workout)
-      setRequests(requestsData.requests || [])
+      setIfChanged(setSelectedWorkout, workoutData.workout)
+      setIfChanged(setRequests, requestsData.requests || [])
     } catch (err) {
-      setSelectedWorkout(null)
-      setRequests([])
+      if (!silent) {
+        setSelectedWorkout(null)
+        setRequests([])
+      }
       if (!silent) setMessage(err.message)
     } finally {
       if (!silent) setLoadingDetail(false)
@@ -78,8 +95,10 @@ export function Workouts({ selectedWorkoutId, onSelectWorkout, onBackToList, cur
   useEffect(() => {
     const refresh = () => {
       if (document.visibilityState !== 'visible') return
-      load({ silent: true })
-      if (selectedWorkoutId) loadWorkoutDetail(selectedWorkoutId, { silent: true })
+      preservingScroll(async () => {
+        await load({ silent: true })
+        if (selectedWorkoutId) await loadWorkoutDetail(selectedWorkoutId, { silent: true })
+      })
     }
     const timer = window.setInterval(refresh, 15000)
 
@@ -128,6 +147,8 @@ export function Workouts({ selectedWorkoutId, onSelectWorkout, onBackToList, cur
   )
 
   const set = (key) => (event) => setForm((prev) => ({ ...prev, [key]: event.target.value }))
+  const formPace = calculatePaceMinPerKm(60, form.distanceKm)
+  const formPaceText = Number.isFinite(formPace) ? formPace.toFixed(2) : ''
 
   const create = async (event) => {
     event.preventDefault()
@@ -139,7 +160,6 @@ export function Workouts({ selectedWorkoutId, onSelectWorkout, onBackToList, cur
         meetingPoint: { name: form.meetingName, address: form.meetingAddress },
         route: { name: form.routeName },
         distanceKm: Number(form.distanceKm),
-        paceMinPerKm: Number(form.paceMinPerKm),
         difficulty: form.difficulty,
         participantLimit: Number(form.participantLimit),
       })
@@ -328,19 +348,15 @@ export function Workouts({ selectedWorkoutId, onSelectWorkout, onBackToList, cur
               type="number"
               placeholder="Км"
               min={0.1}
-              max={99999.99}
+              max={250}
               step={0.01}
               required
             />
             <Input
-              value={form.paceMinPerKm}
-              onChange={set('paceMinPerKm')}
-              type="number"
+              value={formPaceText}
+              readOnly
               placeholder="Темп"
-              min={0.1}
-              max={99.99}
-              step={0.01}
-              required
+              title="Темп рассчитывается автоматически: 60 минут / дистанция"
             />
             <Select value={form.difficulty} onChange={set('difficulty')}>
               <option value="easy">Легкая</option>
