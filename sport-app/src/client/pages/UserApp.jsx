@@ -870,15 +870,15 @@ export function UserApp({ user, onLogout }) {
           (mode === 'edit' ||
             !requireVerificationToCreateWorkouts ||
             currentUser.phoneVerified) && (
-          <WorkoutForm
-            mode={mode}
-            form={form}
-            setForm={setForm}
-            saving={saving}
-            minLeadHours={workoutCreateMinLeadHours}
-            onSubmit={saveWorkout}
-          />
-        )}
+            <WorkoutForm
+              mode={mode}
+              form={form}
+              setForm={setForm}
+              saving={saving}
+              minLeadHours={workoutCreateMinLeadHours}
+              onSubmit={saveWorkout}
+            />
+          )}
 
         {screen === 'organizer' && selectedWorkout && (
           <OrganizerScreen
@@ -2727,7 +2727,9 @@ function sortWorkoutsNewestFirst(left, right) {
 function isUploadedAchievementIcon(value) {
   return (
     typeof value === 'string' &&
-    (value.startsWith('/uploads/') || value.includes('/uploads/') || value.startsWith('data:image/'))
+    (value.startsWith('/uploads/') ||
+      value.includes('/uploads/') ||
+      value.startsWith('data:image/'))
   )
 }
 

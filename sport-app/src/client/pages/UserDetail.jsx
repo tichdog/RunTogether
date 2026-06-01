@@ -227,9 +227,7 @@ export function UserDetail({ user, currentAdmin, onBack, onChanged, onDeleted })
                     marginBottom: 8,
                   }}
                 >
-                  <span style={{ color: T.danger, fontSize: 12, fontWeight: 800 }}>
-                    Блокировка
-                  </span>
+                  <span style={{ color: T.danger, fontSize: 12, fontWeight: 800 }}>Блокировка</span>
                   <strong style={{ color: T.danger, fontSize: 13 }}>До: {blockUntilText}</strong>
                 </div>
                 <div
@@ -443,7 +441,9 @@ export function UserDetail({ user, currentAdmin, onBack, onChanged, onDeleted })
 function isUploadedAchievementIcon(value) {
   return (
     typeof value === 'string' &&
-    (value.startsWith('/uploads/') || value.includes('/uploads/') || value.startsWith('data:image/'))
+    (value.startsWith('/uploads/') ||
+      value.includes('/uploads/') ||
+      value.startsWith('data:image/'))
   )
 }
 

@@ -426,13 +426,19 @@ export function Workouts({ selectedWorkoutId, onSelectWorkout, onBackToList, cur
         </div>
 
         {filtered.map((workout, index) => (
-          <div key={workout.id} className="admin-workout-row" style={rowGrid(index, filtered.length)}>
+          <div
+            key={workout.id}
+            className="admin-workout-row"
+            style={rowGrid(index, filtered.length)}
+          >
             <span style={{ fontSize: 12, color: T.textHint, fontWeight: 700 }}>{workout.id}</span>
             <span style={{ fontSize: 13, fontWeight: 700, overflowWrap: 'anywhere' }}>
               {workout.organizerName}
             </span>
             <div>
-              <div style={{ fontSize: 13, color: T.text, fontWeight: 700, overflowWrap: 'anywhere' }}>
+              <div
+                style={{ fontSize: 13, color: T.text, fontWeight: 700, overflowWrap: 'anywhere' }}
+              >
                 {workout.title}
               </div>
               <div style={{ fontSize: 12, color: T.textMuted }}>

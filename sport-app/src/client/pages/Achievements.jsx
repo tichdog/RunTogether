@@ -250,10 +250,7 @@ export function Achievements() {
                 <div style={iconPreviewBox}>
                   <AchievementIcon icon={iconPreviewUrl || form.icon} />
                 </div>
-                <Select
-                  value={ICONS.includes(form.icon) ? form.icon : ''}
-                  onChange={setIconChoice}
-                >
+                <Select value={ICONS.includes(form.icon) ? form.icon : ''} onChange={setIconChoice}>
                   <option value="" disabled>
                     Картинка
                   </option>

@@ -203,9 +203,7 @@ function ReportCard({ report, decision, saving, onDecision, onModerate, onSelect
         className="report-card-grid"
         style={{
           display: 'grid',
-          gridTemplateColumns: isOpen
-            ? 'minmax(0, 1fr) minmax(260px, 300px)'
-            : 'minmax(0, 1fr)',
+          gridTemplateColumns: isOpen ? 'minmax(0, 1fr) minmax(260px, 300px)' : 'minmax(0, 1fr)',
           gap: 16,
           alignItems: 'start',
         }}
@@ -230,9 +228,7 @@ function ReportCard({ report, decision, saving, onDecision, onModerate, onSelect
               </span>
             )}
           </div>
-          <h2
-            style={{ margin: '0 0 8px', color: T.text, fontSize: 18, overflowWrap: 'anywhere' }}
-          >
+          <h2 style={{ margin: '0 0 8px', color: T.text, fontSize: 18, overflowWrap: 'anywhere' }}>
             {report.reason}
           </h2>
           {report.details && (
@@ -283,7 +279,10 @@ function ReportCard({ report, decision, saving, onDecision, onModerate, onSelect
         </div>
 
         {isOpen && (
-          <div className="report-decision-panel" style={{ width: '100%', display: 'grid', gap: 10 }}>
+          <div
+            className="report-decision-panel"
+            style={{ width: '100%', display: 'grid', gap: 10 }}
+          >
             <SectionTitle>Решение</SectionTitle>
             <Select
               value={decision.action}
